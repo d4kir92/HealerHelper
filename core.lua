@@ -1,7 +1,7 @@
 local _, HealerHelper = ...
 local MAXROW = 5
 local MAX = 10
-local LAYOUT = "BOTTOM" -- "BOTTOM", "RIGHT"
+local LAYOUT = "RIGHT" -- "BOTTOM", "RIGHT"
 local ActionButtonCastType = {
     Cast = 1,
     Channel = 2,
@@ -35,6 +35,7 @@ function HealerHelper:SetSpell(btn, id)
     btn:SetAttribute("type1", "spell")
     btn:SetAttribute("spell1", id)
     btn.spellID = id
+    btn.action = nil
     local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
     btn.icon:SetTexture(iconTexture)
 end
@@ -43,7 +44,7 @@ function HealerHelper:ClearSpell(btn)
     btn:SetAttribute("type1", nil)
     btn:SetAttribute("spell1", nil)
     btn.spellID = nil
-    btn.heahel_icon = nil
+    btn.action = 1
     btn.icon:SetTexture(nil)
 end
 
@@ -73,6 +74,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
     local customButton = CreateFrame("CheckButton", name .. "_HealerHelper_" .. i, frame, "SecureActionButtonTemplate, ActionButtonTemplate")
     customButton:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
     customButton:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "player")
+    customButton:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     function customButton:ClearReticle()
         if customButton.TargetReticleAnimFrame:IsShown() then
             customButton.TargetReticleAnimFrame:Hide()
@@ -118,15 +120,18 @@ function HealerHelper:AddActionButton(frame, bar, i)
         function(sel, event, val)
             if event == "UNIT_SPELLCAST_START" then
                 sel:PlaySpellCastAnim(ActionButtonCastType.Cast)
-            else
+            elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
+                sel:PlaySpellCastAnim(ActionButtonCastType.Empowered)
+            elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+                sel:StopSpellCastAnim(false, ActionButtonCastType.Cast)
+                sel:StopTargettingReticleAnim()
             end
         end
     )
 
-    --[[customButton:SetAttribute("type", "spell")
+    customButton:SetAttribute("type", "spell")
     customButton:SetAttribute("action", nil)
-    customButton:SetAttribute("action1", nil)]]
-    customButton:RegisterForClicks("AnyUp", "AnyDown")
+    customButton:SetAttribute("action1", nil)
     hooksecurefunc(
         frame,
         "SetAttribute",
@@ -153,14 +158,19 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     )
 
-    customButton:SetAttribute("unit", frame.displayedUnit)
-    HealerHelper:SetSpell(customButton, HEAHEL["spell" .. i])
+    customButton:SetAttribute("unit", frame.displayedUnit or frame.unit)
+    if HEAHEL["spell" .. i] ~= nil then
+        HealerHelper:SetSpell(customButton, HEAHEL["spell" .. i])
+    else
+        HealerHelper:ClearSpell(customButton)
+    end
+
     HealerHelper:HandleBtn(frame, customButton, i)
     local function OnReceiveDrag(sel)
         local cursorType, _, _, spellID = GetCursorInfo()
         if cursorType and cursorType == "spell" then
-            HealerHelper:SetSpell(sel, spellID)
             HEAHEL["spell" .. i] = spellID
+            HealerHelper:SetSpell(sel, spellID)
             ClearCursor()
         end
     end
@@ -174,8 +184,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
             if not Settings.GetValue("lockActionBars") or IsModifiedClick("PICKUPACTION") then
                 local spellName = sel:GetAttribute("spell1")
                 if spellName then
-                    C_Spell.PickupSpell(spellName)
                     HealerHelper:ClearSpell(sel)
+                    C_Spell.PickupSpell(spellName)
                 end
             end
         end
