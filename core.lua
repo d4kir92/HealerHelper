@@ -13,14 +13,14 @@ healerHelper:RegisterEvent("PLAYER_LOGIN")
 healerHelper:SetScript(
     "OnEvent",
     function(sel, ...)
-        HEAHEL = HEAHEL or {}
+        HEAHELPC = HEAHELPC or {}
         HealerHelper:SetAddonOutput("HealerHelper", "134149")
         HealerHelper:SetVersion("HealerHelper", "134149", 0.1)
         local healBars = {}
         hooksecurefunc(
             "CompactUnitFrame_SetUpFrame",
             function(frame, func)
-                if frame and frame:GetName() and healBars[frame] == nil then
+                if frame and frame.GetName and healBars[frame] == nil then
                     healBars[frame] = true
                     HealerHelper:AddHealbar(frame)
                 end
@@ -50,27 +50,30 @@ end
 
 function HealerHelper:HandleBtn(unitFrame, btn, i)
     local btnsLength = btn:GetWidth() * MAXROW
-    btn:SetScale(unitFrame:GetWidth() / btnsLength)
-    btn:ClearAllPoints()
-    if LAYOUT == "RIGHT" then
-        if i > MAXROW then
-            btn:SetPoint("TOPLEFT", unitFrame, "TOPRIGHT", (i - 1 - MAXROW) * btn:GetWidth(), -btn:GetHeight())
+    if not InCombatLockdown() then
+        btn:SetScale(unitFrame:GetWidth() / btnsLength)
+        btn:ClearAllPoints()
+        if LAYOUT == "RIGHT" then
+            if i > MAXROW then
+                btn:SetPoint("TOPLEFT", unitFrame, "TOPRIGHT", (i - 1 - MAXROW) * btn:GetWidth(), -btn:GetHeight())
+            else
+                btn:SetPoint("TOPLEFT", unitFrame, "TOPRIGHT", (i - 1) * btn:GetWidth(), 0)
+            end
+        elseif LAYOUT == "BOTTOM" then
+            if i > MAXROW then
+                btn:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", (i - 1 - MAXROW) * btn:GetWidth(), -btn:GetHeight())
+            else
+                btn:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", (i - 1) * btn:GetWidth(), 0)
+            end
         else
-            btn:SetPoint("TOPLEFT", unitFrame, "TOPRIGHT", (i - 1) * btn:GetWidth(), 0)
+            HealerHelper:MSG("Missing Layout", LAYOUT)
         end
-    elseif LAYOUT == "BOTTOM" then
-        if i > MAXROW then
-            btn:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", (i - 1 - MAXROW) * btn:GetWidth(), -btn:GetHeight())
-        else
-            btn:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", (i - 1) * btn:GetWidth(), 0)
-        end
-    else
-        HealerHelper:MSG("Missing Layout", LAYOUT)
     end
 end
 
 function HealerHelper:AddActionButton(frame, bar, i)
-    local name = frame:GetName()
+    local name = frame.GetName and frame:GetName() or nil
+    if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_HealerHelper_" .. i, frame, "SecureActionButtonTemplate, ActionButtonTemplate")
     customButton:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
     customButton:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "player")
@@ -117,21 +120,30 @@ function HealerHelper:AddActionButton(frame, bar, i)
 
     customButton:SetScript(
         "OnEvent",
-        function(sel, event, val)
-            if event == "UNIT_SPELLCAST_START" then
-                sel:PlaySpellCastAnim(ActionButtonCastType.Cast)
-            elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
-                sel:PlaySpellCastAnim(ActionButtonCastType.Empowered)
-            elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-                sel:StopSpellCastAnim(false, ActionButtonCastType.Cast)
-                sel:StopTargettingReticleAnim()
+        function(sel, event, val, guid, spellID)
+            if spellID == customButton.spellID then
+                if event == "UNIT_SPELLCAST_START" then
+                    sel:PlaySpellCastAnim(ActionButtonCastType.Cast)
+                elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
+                    sel:PlaySpellCastAnim(ActionButtonCastType.Empowered)
+                elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+                    sel:StopSpellCastAnim(false, ActionButtonCastType.Cast)
+                    sel:StopTargettingReticleAnim()
+                end
             end
         end
     )
 
-    customButton:SetAttribute("type", "spell")
-    customButton:SetAttribute("action", nil)
-    customButton:SetAttribute("action1", nil)
+    if not InCombatLockdown() then
+        customButton:SetAttribute("type", "spell")
+        customButton:SetAttribute("action", nil)
+        customButton:SetAttribute("action1", nil)
+        customButton:SetAttribute("unit", frame.displayedUnit or frame.unit)
+        customButton:SetAttribute("ignoreModifiers", "true")
+    else
+        HealerHelper:MSG("[Failed] In Combat")
+    end
+
     hooksecurefunc(
         frame,
         "SetAttribute",
@@ -158,33 +170,42 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     )
 
-    customButton:SetAttribute("unit", frame.displayedUnit or frame.unit)
-    if HEAHEL["spell" .. i] ~= nil then
-        HealerHelper:SetSpell(customButton, HEAHEL["spell" .. i])
+    if HEAHELPC["spell" .. i] ~= nil then
+        HealerHelper:SetSpell(customButton, HEAHELPC["spell" .. i])
     else
         HealerHelper:ClearSpell(customButton)
     end
 
     HealerHelper:HandleBtn(frame, customButton, i)
-    local function OnReceiveDrag(sel)
-        local cursorType, _, _, spellID = GetCursorInfo()
-        if cursorType and cursorType == "spell" then
-            HEAHEL["spell" .. i] = spellID
-            HealerHelper:SetSpell(sel, spellID)
-            ClearCursor()
-        end
-    end
-
     customButton:RegisterForDrag("LeftButton")
     customButton:RegisterForClicks("AnyUp", "AnyDown")
-    customButton:SetScript("OnReceiveDrag", OnReceiveDrag)
+    customButton:SetScript(
+        "OnReceiveDrag",
+        function(sel)
+            local cursorType, _, _, spellID = GetCursorInfo()
+            if cursorType and cursorType == "spell" then
+                HEAHELPC["spell" .. i] = spellID
+                HealerHelper:SetSpell(sel, spellID)
+                ClearCursor()
+            end
+        end
+    )
+
     customButton:SetScript(
         "OnDragStart",
         function(sel)
+            if InCombatLockdown() then
+                HealerHelper:MSG("[OnDragStart] You are in Combat")
+
+                return
+            end
+
             if not Settings.GetValue("lockActionBars") or IsModifiedClick("PICKUPACTION") then
-                local spellName = sel:GetAttribute("spell1")
+                local spellName = HEAHELPC["spell" .. i]
                 if spellName then
+                    HEAHELPC["spell" .. i] = nil
                     HealerHelper:ClearSpell(sel)
+                    print(spellName)
                     C_Spell.PickupSpell(spellName)
                 end
             end
