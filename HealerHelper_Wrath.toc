@@ -6,8 +6,8 @@
 ## DefaultState: enabled
 ## SavedVariables: HEAHEL
 ## SavedVariablesPerCharacter: HEAHELPC
-## X-Curse-Project-ID: 1070933
-## X-Wago-ID: v63oE76b
+## X-Curse-Project-ID: 1091858
+## X-Wago-ID: EGPXoWG1
 
 libs\D4Lib\D4Lib.xml
 
