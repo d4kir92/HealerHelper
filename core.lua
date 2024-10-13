@@ -62,7 +62,7 @@ healerHelper:SetScript(
         hooksecurefunc(
             "CompactUnitFrame_SetUpFrame",
             function(frame, func)
-                if frame and frame.GetName and healBars[frame] == nil then
+                if frame ~= nil and healBars[frame] == nil then
                     healBars[frame] = true
                     HealerHelper:AddHealbar(frame)
                     HealerHelper:AddIcons(frame)
@@ -225,7 +225,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.5"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.6"))
     end
 )
 
@@ -280,7 +280,7 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
 end
 
 function HealerHelper:AddActionButton(frame, bar, i)
-    local name = bar.GetName and bar:GetName() or nil
+    local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "SecureActionButtonTemplate, ActionButtonTemplate")
     customButton:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
@@ -438,12 +438,25 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 end
 
-function HealerHelper:AddHealbar(frame)
-    local name = frame:GetName()
-    if frame and name ~= nil then
-        local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. frame:GetName(), frame)
+function HealerHelper:AddHealbar(unitFrame)
+    if unitFrame == nil then
+        print("Error: 'unitFrame' is nil")
+
+        return
+    end
+
+    if type(unitFrame) ~= "table" then
+        print("Error: 'unitFrame' is not a valid frame object")
+
+        return
+    end
+
+    if not unitFrame.GetName or unitFrame:GetName(unitFrame) == nil then return end
+    local name = unitFrame:GetName()
+    if name ~= nil then
+        local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame)
         bar:SetSize(10, 10)
-        bar:SetPoint("CENTER", frame, "CENTER", 0, 0)
+        bar:SetPoint("CENTER", unitFrame, "CENTER", 0, 0)
         if DEBUG then
             bar.t = bar:CreateTexture()
             bar.t:SetColorTexture(1, 0, 0)
@@ -451,9 +464,87 @@ function HealerHelper:AddHealbar(frame)
         end
 
         for i = 1, MAX do
-            HealerHelper:AddActionButton(frame, bar, i)
+            HealerHelper:AddActionButton(unitFrame, bar, i)
         end
     end
+end
+
+function HealerHelper:AddDispellBorder(frame)
+    local name = frame:GetName()
+    if name == nil then return end
+    local ActionBarButtonSpellActivationAlert = CreateFrame("Frame", "", frame)
+    ActionBarButtonSpellActivationAlert:SetSize(150, 150)
+    ActionBarButtonSpellActivationAlert:SetPoint("CENTER")
+    local ProcStartFlipbook = ActionBarButtonSpellActivationAlert:CreateTexture(nil, "ARTWORK")
+    ProcStartFlipbook:SetAtlas("UI-HUD-ActionBar-Proc-Start-Flipbook")
+    ProcStartFlipbook:SetSize(150, 150)
+    ProcStartFlipbook:SetPoint("CENTER")
+    ProcStartFlipbook:SetAlpha(1)
+    local ProcLoopFlipbook = ActionBarButtonSpellActivationAlert:CreateTexture(nil, "ARTWORK")
+    ProcLoopFlipbook:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+    ProcLoopFlipbook:SetAllPoints()
+    ProcLoopFlipbook:SetAlpha(0)
+    local ProcLoop = ProcLoopFlipbook:CreateAnimationGroup()
+    ProcLoop:SetLooping("REPEAT")
+    local ProcLoopAlpha = ProcLoop:CreateAnimation("Alpha")
+    ProcLoopAlpha:SetDuration(0.001)
+    ProcLoopAlpha:SetFromAlpha(1)
+    ProcLoopAlpha:SetToAlpha(1)
+    local ProcLoopFlipAnim = ProcLoop:CreateAnimation("FlipBook")
+    ProcLoopFlipAnim:SetDuration(1)
+    ProcLoopFlipAnim:SetFlipBookRows(6)
+    ProcLoopFlipAnim:SetFlipBookColumns(5)
+    ProcLoopFlipAnim:SetFlipBookFrames(30)
+    local ProcStartAnim = ProcStartFlipbook:CreateAnimationGroup()
+    ProcStartAnim:SetToFinalAlpha(true)
+    local ProcStartAlpha = ProcStartAnim:CreateAnimation("Alpha")
+    ProcStartAlpha:SetDuration(0.001)
+    ProcStartAlpha:SetFromAlpha(1)
+    ProcStartAlpha:SetToAlpha(1)
+    local ProcStartFlipAnim = ProcStartAnim:CreateAnimation("FlipBook")
+    ProcStartFlipAnim:SetDuration(0.7)
+    ProcStartFlipAnim:SetFlipBookRows(6)
+    ProcStartFlipAnim:SetFlipBookColumns(5)
+    ProcStartFlipAnim:SetFlipBookFrames(30)
+    local ProcStartFadeOut = ProcStartAnim:CreateAnimation("Alpha")
+    ProcStartFadeOut:SetDuration(0.001)
+    ProcStartFadeOut:SetOrder(2)
+    ProcStartFadeOut:SetFromAlpha(1)
+    ProcStartFadeOut:SetToAlpha(0)
+    ProcStartAnim:Play()
+    ProcLoop:Play()
+    local sw, sh = frame:GetSize()
+    hooksecurefunc(
+        frame,
+        "SetSize",
+        function(sel, w, h)
+            ActionBarButtonSpellActivationAlert:SetSize(w * 1.6, h * 1.6)
+        end
+    )
+
+    ActionBarButtonSpellActivationAlert:SetSize(sw * 1.6, sh * 1.6)
+    ActionBarButtonSpellActivationAlert:Hide()
+    local function OnDebuffDispellable()
+        local c = HealerHelper:GetDispellableDebuffsCount(frame.unit)
+        if ActionBarButtonSpellActivationAlert then
+            if c > 0 then
+                ActionBarButtonSpellActivationAlert:Show()
+            else
+                ActionBarButtonSpellActivationAlert:Hide()
+            end
+        end
+
+        C_Timer.After(
+            0.1,
+            function()
+                OnDebuffDispellable()
+            end
+        )
+    end
+
+    OnDebuffDispellable()
+
+    return ActionBarButtonSpellActivationAlert
 end
 
 function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func)
@@ -521,35 +612,7 @@ function HealerHelper:AddIcons(frame)
         end
     )
 
-    ActionButton_ShowOverlayGlow(frame)
-    local sw, sh = frame:GetSize()
-    hooksecurefunc(
-        frame,
-        "SetSize",
-        function(sel, w, h)
-            frame.SpellActivationAlert:SetSize(w * 1.6, h * 1.6)
-        end
-    )
-
-    frame.SpellActivationAlert:SetSize(sw * 1.6, sh * 1.6)
-    frame.SpellActivationAlert:Hide()
-    local function OnDebuffDispellable()
-        local c = HealerHelper:GetDispellableDebuffsCount(frame.unit)
-        if c > 0 then
-            frame.SpellActivationAlert:Show()
-        else
-            frame.SpellActivationAlert:Hide()
-        end
-
-        C_Timer.After(
-            0.1,
-            function()
-                OnDebuffDispellable()
-            end
-        )
-    end
-
-    OnDebuffDispellable()
+    HealerHelper:AddDispellBorder(frame)
 end
 
 function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5)
