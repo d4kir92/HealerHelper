@@ -3,11 +3,13 @@ HealerHelper:AddTrans("enUS", "GENERAL", "General")
 HealerHelper:AddTrans("enUS", "MMBTN", "Show Minimapbutton")
 HealerHelper:AddTrans("enUS", "PARTY", "Party")
 HealerHelper:AddTrans("enUS", "LAYOUT", "Party Layout")
-HealerHelper:AddTrans("enUS", "GAP", "Party Gap: %s")
+HealerHelper:AddTrans("enUS", "GAPX", "Party Gap X: %s")
+HealerHelper:AddTrans("enUS", "GAPY", "Party Gap Y: %s")
 HealerHelper:AddTrans("enUS", "OFFSET", "Party Offset: %s")
 HealerHelper:AddTrans("enUS", "RAID", "Raid")
 HealerHelper:AddTrans("enUS", "RLAYOUT", "Raid Layout")
-HealerHelper:AddTrans("enUS", "RGAP", "Raid Gap: %s")
+HealerHelper:AddTrans("enUS", "RGAPX", "Raid Gap X: %s")
+HealerHelper:AddTrans("enUS", "RGAPY", "Raid Gap Y: %s")
 HealerHelper:AddTrans("enUS", "ROFFSET", "Raid Offset: %s")
 local heahel_settings = nil
 function HealerHelper:ToggleSettings()
@@ -19,14 +21,14 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion("HealerHelper", "134149", "0.3.0")
+    HealerHelper:SetVersion("HealerHelper", "134149", "0.4.0")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
             ["pTab"] = {"CENTER"},
             ["sw"] = 520,
             ["sh"] = 520,
-            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.3.0")
+            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.4.0")
         }
     )
 
@@ -61,7 +63,10 @@ function HealerHelper:InitSettings()
         {
             ["BOTTOM"] = "BOTTOM",
             ["RIGHT"] = "RIGHT"
-        }
+        },
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
     )
 
     HealerHelper:AppendSlider(
@@ -77,7 +82,19 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendSlider(
-        "GAP",
+        "GAPX",
+        6,
+        0,
+        20,
+        1,
+        0,
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
+    )
+
+    HealerHelper:AppendSlider(
+        "GAPY",
         6,
         0,
         20,
@@ -95,7 +112,10 @@ function HealerHelper:InitSettings()
         {
             ["BOTTOM"] = "BOTTOM",
             ["RIGHT"] = "RIGHT"
-        }
+        },
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
     )
 
     HealerHelper:AppendSlider(
@@ -111,7 +131,19 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendSlider(
-        "RGAP",
+        "RGAPX",
+        6,
+        0,
+        20,
+        1,
+        0,
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
+    )
+
+    HealerHelper:AppendSlider(
+        "RGAPY",
         6,
         0,
         20,
