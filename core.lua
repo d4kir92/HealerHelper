@@ -7,22 +7,6 @@ local ActionButtonCastType = {
     Empowered = 3,
 }
 
-function HealerHelper:DoAfterCombat(callback, from, ...)
-    local args = {...}
-    if InCombatLockdown() then
-        C_Timer.After(
-            0.1,
-            function()
-                HealerHelper:DoAfterCombat(callback, from, unpack(args))
-            end
-        )
-
-        return
-    end
-
-    callback(unpack(args))
-end
-
 function HealerHelper:GetOptionValue(name)
     HEAHELPC = HEAHELPC or {}
     if IsInRaid() then return HEAHELPC["R" .. name] end
@@ -39,6 +23,22 @@ function HealerHelper:SetOptionValue(name, val)
     end
 
     HEAHELPC[name] = val
+end
+
+function HealerHelper:DoAfterCombat(callback, from, ...)
+    local args = {...}
+    if InCombatLockdown() then
+        C_Timer.After(
+            0.1,
+            function()
+                HealerHelper:DoAfterCombat(callback, from, unpack(args))
+            end
+        )
+
+        return
+    end
+
+    callback(unpack(args))
 end
 
 local healerHelper = CreateFrame("Frame")
@@ -65,6 +65,8 @@ healerHelper:SetScript(
                 if frame and frame.GetName and healBars[frame] == nil then
                     healBars[frame] = true
                     HealerHelper:AddHealbar(frame)
+                    HealerHelper:AddIcons(frame)
+                    HealerHelper:AddTexts(frame)
                 end
             end
         )
@@ -223,7 +225,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.1"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.2"))
     end
 )
 
@@ -325,7 +327,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         customButton:SetAttribute("unit", frame.displayedUnit or frame.unit)
         customButton:SetAttribute("ignoreModifiers", "true")
     else
-        HealerHelper:MSG("[Failed] In Combat")
+        HealerHelper:MSG("[Failed] Failed to set Attribute, In Combat: type, action, unit, ignoreModifiers")
     end
 
     hooksecurefunc(
@@ -429,5 +431,175 @@ function HealerHelper:AddHealbar(frame)
         for i = 1, MAX do
             HealerHelper:AddActionButton(frame, bar, i)
         end
+    end
+end
+
+function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func)
+    local icon = frame:CreateTexture()
+    if atlas then
+        icon:SetAtlas(atlas)
+    elseif texture then
+        icon:SetTexture(texture)
+    end
+
+    icon:SetSize(16, 16)
+    icon:SetPoint(p1, p2, p3, p4, p5)
+    local function OnUpdateIcon(parent, ico)
+        func(parent, ico)
+        C_Timer.After(
+            0.1,
+            function()
+                OnUpdateIcon(parent, ico)
+            end
+        )
+    end
+
+    OnUpdateIcon(frame, icon)
+end
+
+function HealerHelper:AddIcons(frame)
+    if frame == nil then return end
+    local name = frame:GetName()
+    if name == nil then return end
+    HealerHelper:AddIcon(
+        frame,
+        "UI-HUD-UnitFrame-Player-Group-LeaderIcon",
+        nil,
+        "BOTTOM",
+        frame,
+        "TOP",
+        0,
+        -5,
+        function(parent, icon)
+            if parent.unit == nil then return end
+            if UnitIsGroupLeader(parent.unit) then
+                icon:SetAlpha(1)
+            else
+                icon:SetAlpha(0)
+            end
+        end
+    )
+
+    HealerHelper:AddIcon(
+        frame,
+        nil,
+        nil,
+        "LEFT",
+        frame,
+        "LEFT",
+        4,
+        0,
+        function(parent, icon)
+            if parent.unit == nil then return end
+            if GetRaidTargetIndex(parent.unit) then
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
+            else
+                icon:SetTexture(nil)
+            end
+        end
+    )
+end
+
+function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5)
+    local t = frame:CreateFontString("_UnitLevel", "OVERLAY", "GameTooltipText")
+    local f1, _, f3 = t:GetFont()
+    t:SetFont(f1, ts, f3)
+    t:SetPoint(p1, p2, p3, p4, p5)
+    local function OnTextUpdate(parent, text)
+        func(parent, text)
+        C_Timer.After(
+            0.1,
+            function()
+                OnTextUpdate(parent, text)
+            end
+        )
+    end
+
+    OnTextUpdate(frame, t)
+end
+
+function HealerHelper:AddTexts(frame)
+    if frame == nil then return end
+    local name = frame:GetName()
+    if name == nil then return end
+    local healthBar = _G[name .. "HealthBarBackground"]
+    if healthBar then
+        HealerHelper:AddTextStr(
+            frame,
+            function(parent, text)
+                if InCombatLockdown() then
+                    text:SetText("")
+
+                    return
+                end
+
+                if parent.unit == nil then
+                    text:SetText("")
+
+                    return
+                end
+
+                local level = UnitLevel(parent.unit)
+                if level == nil then
+                    text:SetText("")
+
+                    return
+                end
+
+                local t = level
+                if UnitEffectiveLevel ~= nil and UnitEffectiveLevel(parent.unit) ~= UnitLevel(parent.unit) then
+                    t = UnitEffectiveLevel(parent.unit) .. " (" .. UnitLevel(parent.unit) .. ")"
+                end
+
+                local max = 60
+                if GetMaxLevelForPlayerExpansion then
+                    max = GetMaxLevelForPlayerExpansion()
+                end
+
+                if level == max and (UnitEffectiveLevel == nil or UnitEffectiveLevel(parent.unit) == level) then
+                    text:SetText("")
+
+                    return
+                else
+                    text:SetText(t)
+                end
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0
+        )
+
+        HealerHelper:AddTextStr(
+            frame,
+            function(parent, text)
+                if InCombatLockdown() then
+                    text:SetText("")
+
+                    return
+                end
+
+                if parent.unit == nil then
+                    text:SetText("")
+
+                    return
+                end
+
+                if C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary and C_PlayerInfo.GetPlayerMythicPlusRatingSummary(parent.unit) then
+                    local score = C_PlayerInfo.GetPlayerMythicPlusRatingSummary(parent.unit).currentSeasonScore
+                    local max = 60
+                    local level = UnitLevel(parent.unit)
+                    if level == nil then
+                        text:SetText("")
+
+                        return
+                    end
+
+                    if GetMaxLevelForPlayerExpansion then
+                        max = GetMaxLevelForPlayerExpansion()
+                    end
+
+                    if UnitLevel(parent.unit) == max and (UnitEffectiveLevel == nil or UnitEffectiveLevel(parent.unit) == level) then
+                        text:SetText("M+: " .. score)
+                    end
+                end
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0
+        )
     end
 end
