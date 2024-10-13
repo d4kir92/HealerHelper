@@ -225,7 +225,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.2"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.3"))
     end
 )
 
@@ -255,6 +255,25 @@ function HealerHelper:HandleBtn(bar, btn, i)
             btn:SetPoint("TOPLEFT", bar, "TOPLEFT", (i - 1) * btn:GetWidth(), 0)
         end
     end
+end
+
+function HealerHelper:GetDispellableDebuffsCount(unit)
+    if unit == nil then return 0 end
+    local dispellableCount = 0
+    AuraUtil.ForEachAura(
+        unit,
+        "HARMFUL",
+        nil,
+        function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod, value1, value2, value3)
+            if debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
+                dispellableCount = dispellableCount + 1
+            end
+
+            return false
+        end
+    )
+
+    return dispellableCount
 end
 
 function HealerHelper:AddActionButton(frame, bar, i)
@@ -338,7 +357,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 HealerHelper:DoAfterCombat(
                     function(v)
                         customButton:SetAttribute("unit", v)
-                    end, val
+                    end, "UnitFrame -> SetAttribute", val
                 )
             end
         end
@@ -498,6 +517,36 @@ function HealerHelper:AddIcons(frame)
             end
         end
     )
+
+    ActionButton_ShowOverlayGlow(frame)
+    local sw, sh = frame:GetSize()
+    hooksecurefunc(
+        frame,
+        "SetSize",
+        function(sel, w, h)
+            frame.SpellActivationAlert:SetSize(w * 3, h * 3)
+        end
+    )
+
+    frame.SpellActivationAlert:SetSize(sw * 3, sh * 3)
+    frame.SpellActivationAlert:Hide()
+    local function OnDebuffDispellable()
+        local c = HealerHelper:GetDispellableDebuffsCount(frame.unit)
+        if c > 0 then
+            frame.SpellActivationAlert:Show()
+        else
+            frame.SpellActivationAlert:Hide()
+        end
+
+        C_Timer.After(
+            0.1,
+            function()
+                OnDebuffDispellable()
+            end
+        )
+    end
+
+    OnDebuffDispellable()
 end
 
 function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5)
