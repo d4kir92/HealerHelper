@@ -225,7 +225,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.3"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.4"))
     end
 )
 
@@ -524,11 +524,11 @@ function HealerHelper:AddIcons(frame)
         frame,
         "SetSize",
         function(sel, w, h)
-            frame.SpellActivationAlert:SetSize(w * 3, h * 3)
+            frame.SpellActivationAlert:SetSize(w * 1.6, h * 1.6)
         end
     )
 
-    frame.SpellActivationAlert:SetSize(sw * 3, sh * 3)
+    frame.SpellActivationAlert:SetSize(sw * 1.6, sh * 1.6)
     frame.SpellActivationAlert:Hide()
     local function OnDebuffDispellable()
         local c = HealerHelper:GetDispellableDebuffsCount(frame.unit)
