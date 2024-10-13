@@ -223,7 +223,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.0"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.1"))
     end
 )
 
@@ -333,7 +333,11 @@ function HealerHelper:AddActionButton(frame, bar, i)
         "SetAttribute",
         function(sel, key, val)
             if key == "unit" then
-                customButton:SetAttribute("unit", val)
+                HealerHelper:DoAfterCombat(
+                    function(v)
+                        customButton:SetAttribute("unit", v)
+                    end, val
+                )
             end
         end
     )
@@ -411,7 +415,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
 end
 
 function HealerHelper:AddHealbar(frame)
-    if frame and frame:GetName() ~= nil then
+    local name = frame:GetName()
+    if frame and name ~= nil then
         local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. frame:GetName(), frame)
         bar:SetSize(10, 10)
         bar:SetPoint("CENTER", frame, "CENTER", 0, 0)
