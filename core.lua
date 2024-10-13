@@ -225,14 +225,14 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.4"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.5"))
     end
 )
 
 function HealerHelper:SetSpell(btn, id)
     btn:SetAttribute("type1", "spell")
     btn:SetAttribute("spell1", id)
-    btn.spellID = id
+    btn.spellId = id
     btn.action = nil
     local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
     btn.icon:SetTexture(iconTexture)
@@ -241,7 +241,7 @@ end
 function HealerHelper:ClearSpell(btn)
     btn:SetAttribute("type1", nil)
     btn:SetAttribute("spell1", nil)
-    btn.spellID = nil
+    btn.spellId = nil
     btn.action = 1
     btn.icon:SetTexture(nil)
 end
@@ -265,7 +265,10 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
         "HARMFUL",
         nil,
         function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod, value1, value2, value3)
-            if debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
+            -- AFFIX
+            if spellId == 440313 then
+                dispellableCount = dispellableCount + 1
+            elseif debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
                 dispellableCount = dispellableCount + 1
             end
 
@@ -325,8 +328,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
 
     customButton:SetScript(
         "OnEvent",
-        function(sel, event, val, guid, spellID)
-            if spellID == customButton.spellID then
+        function(sel, event, val, guid, spellId)
+            if spellId == customButton.spellId then
                 if event == "UNIT_SPELLCAST_START" then
                     sel:PlaySpellCastAnim(ActionButtonCastType.Cast)
                 elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
@@ -405,10 +408,10 @@ function HealerHelper:AddActionButton(frame, bar, i)
     customButton:SetScript(
         "OnReceiveDrag",
         function(sel)
-            local cursorType, _, _, spellID = GetCursorInfo()
+            local cursorType, _, _, spellId = GetCursorInfo()
             if cursorType and cursorType == "spell" then
-                HealerHelper:SetOptionValue("spell" .. i, spellID)
-                HealerHelper:SetSpell(sel, spellID)
+                HealerHelper:SetOptionValue("spell" .. i, spellId)
+                HealerHelper:SetSpell(sel, spellId)
                 ClearCursor()
             end
         end
