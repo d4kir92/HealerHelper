@@ -31,7 +31,7 @@ function HealerHelper:DoAfterCombat(callback, from, ...)
     local args = {...}
     if InCombatLockdown() then
         C_Timer.After(
-            0.1,
+            0.2,
             function()
                 HealerHelper:DoAfterCombat(callback, from, unpack(args))
             end
@@ -240,17 +240,21 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.7"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.8"))
     end
 )
 
-function HealerHelper:SetSpellForBtn(btn, id)
-    btn:SetAttribute("type1", "spell")
-    btn:SetAttribute("spell1", id)
-    btn.spellId = id
-    btn.action = 1
-    local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
-    btn.icon:SetTexture(iconTexture)
+function HealerHelper:SetSpellForBtn(b, i)
+    HealerHelper:DoAfterCombat(
+        function(btn, id)
+            btn:SetAttribute("type1", "spell")
+            btn:SetAttribute("spell1", id)
+            btn.spellId = id
+            btn.action = 1
+            local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
+            btn.icon:SetTexture(iconTexture)
+        end, "SetSpellForBtn", b, i
+    )
 end
 
 function HealerHelper:SetSpell(btn, id, i)
@@ -264,12 +268,16 @@ function HealerHelper:SetSpell(btn, id, i)
     end
 end
 
-function HealerHelper:ClearSpellForBtn(btn)
-    btn:SetAttribute("type1", nil)
-    btn:SetAttribute("spell1", nil)
-    btn.spellId = nil
-    btn.action = 1
-    btn.icon:SetTexture(nil)
+function HealerHelper:ClearSpellForBtn(b)
+    HealerHelper:DoAfterCombat(
+        function(btn)
+            btn:SetAttribute("type1", nil)
+            btn:SetAttribute("spell1", nil)
+            btn.spellId = nil
+            btn.action = 1
+            btn.icon:SetTexture(nil)
+        end, "ClearSpellForBtn", b
+    )
 end
 
 function HealerHelper:ClearSpell(btn, i)
@@ -462,15 +470,15 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     )
 
-    if not InCombatLockdown() then
-        customButton:SetAttribute("type", "spell")
-        customButton:SetAttribute("action", nil)
-        customButton:SetAttribute("action1", nil)
-        customButton:SetAttribute("unit", frame.displayedUnit or frame.unit)
-        customButton:SetAttribute("ignoreModifiers", "true")
-    else
-        HealerHelper:MSG("[Failed] Failed to set Attribute, In Combat: type, action, unit, ignoreModifiers")
-    end
+    HealerHelper:DoAfterCombat(
+        function(btn, parent)
+            btn:SetAttribute("type", "spell")
+            btn:SetAttribute("action", nil)
+            btn:SetAttribute("action1", nil)
+            btn:SetAttribute("unit", parent.displayedUnit or parent.unit)
+            btn:SetAttribute("ignoreModifiers", "true")
+        end, "AddActionButton", customButton, frame
+    )
 
     hooksecurefunc(
         frame,
