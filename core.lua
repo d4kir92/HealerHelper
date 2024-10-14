@@ -1,4 +1,5 @@
 local AddonName, HealerHelper = ...
+local DEBUG = false
 local MAXROW = 5
 local MAX = 10
 local ActionButtonCastType = {
@@ -7,6 +8,7 @@ local ActionButtonCastType = {
     Empowered = 3,
 }
 
+local actionbuttons = {}
 function HealerHelper:GetOptionValue(name)
     HEAHELPC = HEAHELPC or {}
     if IsInRaid() then return HEAHELPC["R" .. name] end
@@ -79,7 +81,12 @@ healerHelper:SetScript(
                     return "RIGHT"
                 end
             elseif IsInGroup() then
-                local sw, sh = CompactPartyFrame:GetSize()
+                local frame = CompactPartyFrame
+                if frame == nil then
+                    frame = CompactRaidFrameContainer
+                end
+
+                local sw, sh = frame:GetSize()
                 if sw > sh then
                     return "RIGHT"
                 else
@@ -189,7 +196,8 @@ healerHelper:SetScript(
             if test then return end
             test = true
             if IsInRaid() then
-                for i = 1, MAX_RAID_MEMBERS do
+                local max = MAX_RAID_MEMBERS or 40
+                for i = 1, max do
                     local frame = _G["CompactRaidFrame" .. i]
                     if frame then
                         UpdateFramePosition(frame, i)
@@ -207,10 +215,17 @@ healerHelper:SetScript(
                     end
                 end
             else
-                for i = 1, MEMBERS_PER_RAID_GROUP do
+                local max = MEMBERS_PER_RAID_GROUP or 5
+                for i = 1, max do
                     local frame = _G["CompactPartyFrameMember" .. i]
+                    if frame == nil then
+                        frame = _G["CompactRaidFrame" .. i]
+                    end
+
                     if frame then
                         UpdateFramePosition(frame, i)
+                    else
+                        break
                     end
                 end
             end
@@ -225,25 +240,47 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.6"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.7"))
     end
 )
 
-function HealerHelper:SetSpell(btn, id)
+function HealerHelper:SetSpellForBtn(btn, id)
     btn:SetAttribute("type1", "spell")
     btn:SetAttribute("spell1", id)
     btn.spellId = id
-    btn.action = nil
+    btn.action = 1
     local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
     btn.icon:SetTexture(iconTexture)
 end
 
-function HealerHelper:ClearSpell(btn)
+function HealerHelper:SetSpell(btn, id, i)
+    actionbuttons[i] = actionbuttons[i] or {}
+    if not tContains(actionbuttons[i], btn) then
+        tinsert(actionbuttons[i], btn)
+    end
+
+    for x, v in pairs(actionbuttons[i]) do
+        HealerHelper:SetSpellForBtn(v, id)
+    end
+end
+
+function HealerHelper:ClearSpellForBtn(btn)
     btn:SetAttribute("type1", nil)
     btn:SetAttribute("spell1", nil)
     btn.spellId = nil
     btn.action = 1
     btn.icon:SetTexture(nil)
+end
+
+function HealerHelper:ClearSpell(btn, i)
+    actionbuttons[i] = actionbuttons[i] or {}
+    if not tContains(actionbuttons[i], btn) then
+        tinsert(actionbuttons[i], btn)
+    end
+
+    for x, v in pairs(actionbuttons[i]) do
+        HealerHelper:ClearSpellForBtn(v)
+    end
 end
 
 function HealerHelper:HandleBtn(bar, btn, i)
@@ -260,60 +297,98 @@ end
 function HealerHelper:GetDispellableDebuffsCount(unit)
     if unit == nil then return 0 end
     local dispellableCount = 0
-    AuraUtil.ForEachAura(
-        unit,
-        "HARMFUL",
-        nil,
-        function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod, value1, value2, value3)
+    if AuraUtil.ForEachAura then
+        AuraUtil.ForEachAura(
+            unit,
+            "HARMFUL",
+            nil,
+            function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod, value1, value2, value3)
+                -- AFFIX
+                if spellId == 440313 then
+                    dispellableCount = dispellableCount + 1
+                elseif debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
+                    dispellableCount = dispellableCount + 1
+                end
+
+                return false
+            end
+        )
+    else
+        for i = 1, 99 do
+            local _, _, _, debuffType, _, _, _, _, _, spellId = UnitAura(unit, i, "HARMFUL")
             -- AFFIX
             if spellId == 440313 then
                 dispellableCount = dispellableCount + 1
             elseif debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
                 dispellableCount = dispellableCount + 1
             end
-
-            return false
         end
-    )
+    end
 
     return dispellableCount
+end
+
+function HealerHelper:RegisterEvent(frame, event, unit)
+    if C_EventUtils.IsEventValid(event) then
+        if unit then
+            frame:RegisterUnitEvent(event, "player")
+        else
+            frame:RegisterEvent(event)
+        end
+    end
 end
 
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "SecureActionButtonTemplate, ActionButtonTemplate")
-    customButton:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
-    customButton:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "player")
-    customButton:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_INTERRUPTED", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SUCCEEDED", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_FAILED", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_START", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_STOP", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_START", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_STOP", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_TARGET", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_CLEAR", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_START", "player")
+    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_STOP", "player")
     function customButton:ClearReticle()
-        if customButton.TargetReticleAnimFrame:IsShown() then
+        if customButton.TargetReticleAnimFrame and customButton.TargetReticleAnimFrame:IsShown() then
             customButton.TargetReticleAnimFrame:Hide()
         end
     end
 
     function customButton:ClearInterruptDisplay()
-        if customButton.InterruptDisplay:IsShown() then
+        if customButton.InterruptDisplay and customButton.InterruptDisplay:IsShown() then
             customButton.InterruptDisplay:Hide()
         end
     end
 
     function customButton:PlaySpellCastAnim(actionButtonCastType)
-        customButton.cooldown:SetSwipeColor(0, 0, 0, 0)
+        if customButton.cooldown then
+            customButton.cooldown:SetSwipeColor(0, 0, 0, 0)
+        end
+
         customButton.hideCooldownFrame = true
         customButton:ClearInterruptDisplay()
         customButton:ClearReticle()
-        customButton.SpellCastAnimFrame:Setup(actionButtonCastType)
+        if customButton.SpellCastAnimFrame then
+            customButton.SpellCastAnimFrame:Setup(actionButtonCastType)
+        end
+
         customButton.actionButtonCastType = actionButtonCastType
     end
 
     function customButton:StopSpellCastAnim(forceStop, actionButtonCastType)
         customButton:StopTargettingReticleAnim()
         if customButton.actionButtonCastType == actionButtonCastType then
-            if forceStop then
-                customButton.SpellCastAnimFrame:Hide()
-            elseif customButton.SpellCastAnimFrame.Fill.CastingAnim:IsPlaying() then
-                customButton.SpellCastAnimFrame:FinishAnimAndPlayBurst()
+            if customButton.SpellCastAnimFrame then
+                if forceStop then
+                    customButton.SpellCastAnimFrame:Hide()
+                elseif customButton.SpellCastAnimFrame.Fill.CastingAnim:IsPlaying() then
+                    customButton.SpellCastAnimFrame:FinishAnimAndPlayBurst()
+                end
             end
 
             customButton.actionButtonCastType = nil
@@ -321,21 +396,66 @@ function HealerHelper:AddActionButton(frame, bar, i)
     end
 
     function customButton:StopTargettingReticleAnim()
-        if customButton.TargetReticleAnimFrame:IsShown() then
+        if customButton.TargetReticleAnimFrame and customButton.TargetReticleAnimFrame:IsShown() then
             customButton.TargetReticleAnimFrame:Hide()
+        end
+    end
+
+    function customButton:PlaySpellInterruptedAnim()
+        customButton:StopSpellCastAnim(true, customButton.actionButtonCastType)
+        if customButton.InterruptDisplay then
+            if customButton.InterruptDisplay:IsShown() then
+                customButton.InterruptDisplay:Hide()
+            end
+
+            customButton.InterruptDisplay:Show()
+        end
+    end
+
+    function ActionBarActionButtonMixin:PlayTargettingReticleAnim()
+        if customButton.InterruptDisplay and customButton.InterruptDisplay:IsShown() then
+            customButton.InterruptDisplay:Hide()
+        end
+
+        if customButton.TargetReticleAnimFrame then
+            customButton.TargetReticleAnimFrame:Setup()
         end
     end
 
     customButton:SetScript(
         "OnEvent",
-        function(sel, event, val, guid, spellId)
+        function(sel, event, ...)
+            local spellId = select(3, ...)
             if spellId == customButton.spellId then
-                if event == "UNIT_SPELLCAST_START" then
+                if event == "UNIT_SPELLCAST_INTERRUPTED" then
+                    sel:PlaySpellInterruptedAnim()
+                elseif event == "UNIT_SPELLCAST_START" then
                     sel:PlaySpellCastAnim(ActionButtonCastType.Cast)
-                elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
-                    sel:PlaySpellCastAnim(ActionButtonCastType.Empowered)
+                elseif event == "UNIT_SPELLCAST_STOP" then
+                    sel:StopSpellCastAnim(true, ActionButtonCastType.Cast)
+                    sel:StopTargettingReticleAnim()
                 elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
                     sel:StopSpellCastAnim(false, ActionButtonCastType.Cast)
+                    sel:StopTargettingReticleAnim()
+                elseif event == "UNIT_SPELLCAST_SENT" or event == "UNIT_SPELLCAST_FAILED" then
+                    sel:StopTargettingReticleAnim()
+                elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
+                    sel:PlaySpellCastAnim(ActionButtonCastType.Empowered)
+                elseif event == "UNIT_SPELLCAST_EMPOWER_STOP" then
+                    local _, _, _, castComplete = ...
+                    local interrupted = not castComplete
+                    if interrupted then
+                        sel:PlaySpellInterruptedAnim()
+                    else
+                        sel:StopSpellCastAnim(interrupted, ActionButtonCastType.Empowered)
+                    end
+                elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
+                    sel:PlaySpellCastAnim(ActionButtonCastType.Channel)
+                elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+                    sel:StopSpellCastAnim(false, ActionButtonCastType.Channel)
+                elseif event == "UNIT_SPELLCAST_RETICLE_TARGET" then
+                    sel:PlayTargettingReticleAnim()
+                elseif event == "UNIT_SPELLCAST_RETICLE_CLEAR" then
                     sel:StopTargettingReticleAnim()
                 end
             end
@@ -397,9 +517,9 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 
     if HealerHelper:GetOptionValue("spell" .. i) ~= nil then
-        HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i))
+        HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i), i)
     else
-        HealerHelper:ClearSpell(customButton)
+        HealerHelper:ClearSpell(customButton, i)
     end
 
     HealerHelper:HandleBtn(frame, customButton, i)
@@ -411,7 +531,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
             local cursorType, _, _, spellId = GetCursorInfo()
             if cursorType and cursorType == "spell" then
                 HealerHelper:SetOptionValue("spell" .. i, spellId)
-                HealerHelper:SetSpell(sel, spellId)
+                HealerHelper:SetSpell(sel, spellId, i)
                 ClearCursor()
             end
         end
@@ -430,7 +550,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 local spellName = HealerHelper:GetOptionValue("spell" .. i)
                 if spellName then
                     HealerHelper:SetOptionValue("spell" .. i, nil)
-                    HealerHelper:ClearSpell(sel)
+                    HealerHelper:ClearSpell(sel, i)
                     C_Spell.PickupSpell(spellName)
                 end
             end
@@ -440,13 +560,13 @@ end
 
 function HealerHelper:AddHealbar(unitFrame)
     if unitFrame == nil then
-        print("Error: 'unitFrame' is nil")
+        HealerHelper:MSG("Error: 'unitFrame' is nil")
 
         return
     end
 
     if type(unitFrame) ~= "table" then
-        print("Error: 'unitFrame' is not a valid frame object")
+        HealerHelper:MSG("Error: 'unitFrame' is not a valid frame object")
 
         return
     end
@@ -606,6 +726,55 @@ function HealerHelper:AddIcons(frame)
             if parent.unit == nil then return end
             if GetRaidTargetIndex(parent.unit) then
                 icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
+            else
+                icon:SetTexture(nil)
+            end
+        end
+    )
+
+    HealerHelper:AddIcon(
+        frame,
+        nil,
+        nil,
+        "TOPRIGHT",
+        frame,
+        "TOPRIGHT",
+        1,
+        -7,
+        function(parent, icon)
+            if InCombatLockdown() then
+                icon:SetTexture(nil)
+
+                return
+            end
+
+            if parent.unit == nil then
+                icon:SetTexture(nil)
+
+                return
+            end
+
+            icon:SetSize(64, 32)
+            icon:SetScale(0.34)
+            if not UnitPlayerControlled(parent.unit) then
+                icon:SetTexture("Interface\\Addons\\HealerHelper\\media\\" .. "bot")
+
+                return
+            end
+
+            local nam, realmName = UnitName(parent.unit)
+            if nam == nil then return end
+            if realmName == nil then
+                realmName = GetRealmName()
+            end
+
+            local lang = nil
+            if realmName then
+                lang = HealerHelper:GetRealmFlag(realmName)
+            end
+
+            if lang then
+                icon:SetTexture("Interface\\Addons\\HealerHelper\\media\\" .. lang)
             else
                 icon:SetTexture(nil)
             end
