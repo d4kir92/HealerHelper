@@ -31,7 +31,7 @@ function HealerHelper:DoAfterCombat(callback, from, ...)
     local args = {...}
     if InCombatLockdown() then
         C_Timer.After(
-            0.2,
+            0.3,
             function()
                 HealerHelper:DoAfterCombat(callback, from, unpack(args))
             end
@@ -240,7 +240,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.8"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.4.9"))
     end
 )
 
@@ -764,7 +764,7 @@ function HealerHelper:AddIcons(frame)
 
             icon:SetSize(64, 32)
             icon:SetScale(0.34)
-            if not UnitPlayerControlled(parent.unit) then
+            if not UnitIsPlayer(parent.unit) then
                 icon:SetTexture("Interface\\Addons\\HealerHelper\\media\\" .. "bot")
 
                 return
