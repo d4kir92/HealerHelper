@@ -4,7 +4,7 @@
 ## Interface-Cata: 40400
 ## Interface: 110002
 
-## Version: 0.5.0
+## Version: 0.5.1
 ## Title: HealerHelper by |cff3FC7EBD4KiR |T132115:16:16:0:0|t 
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Author: D4KiR

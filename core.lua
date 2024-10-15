@@ -273,7 +273,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.0"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.1"))
     end
 )
 
@@ -855,6 +855,8 @@ function HealerHelper:AddTexts(frame)
 
                     if UnitLevel(parent.unit) == max and (UnitEffectiveLevel == nil or UnitEffectiveLevel(parent.unit) == level) then
                         text:SetText("M+: " .. score)
+                    else
+                        text:SetText("")
                     end
                 end
             end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0
