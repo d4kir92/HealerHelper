@@ -1,5 +1,5 @@
 ## Interface: 11504
-## Version: 0.4.9
+## Version: 0.5.0
 ## Title: HealerHelper |T134149:16:16:0:0|t by |cff3FC7EBD4KiR |T132115:16:16:0:0|t 
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Author: D4KiR
@@ -15,4 +15,5 @@ locale\enUS.lua
 locale\deDE.lua
 
 settings.lua
+dispell.lua
 core.lua

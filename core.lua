@@ -27,15 +27,48 @@ function HealerHelper:SetOptionValue(name, val)
     HEAHELPC[name] = val
 end
 
-function HealerHelper:DoAfterCombat(callback, from, ...)
-    local args = {...}
+local callbacks = {}
+function HealerHelper:RunAfterCombat()
     if InCombatLockdown() then
         C_Timer.After(
-            0.3,
+            0.1,
             function()
-                HealerHelper:DoAfterCombat(callback, from, unpack(args))
+                HealerHelper:RunAfterCombat()
             end
         )
+
+        return
+    end
+
+    for from, tab in pairs(callbacks) do
+        local callback = tab.callback
+        local args = tab.args
+        callback(unpack(args))
+    end
+
+    callbacks = {}
+    C_Timer.After(
+        0.1,
+        function()
+            HealerHelper:RunAfterCombat()
+        end
+    )
+end
+
+HealerHelper:RunAfterCombat()
+function HealerHelper:TryRunSecure(callback, from, ...)
+    if from == nil then
+        HealerHelper:MSG("[TryRunSecure] Missing name for args", ...)
+
+        return
+    end
+
+    local args = {...}
+    if InCombatLockdown() then
+        callbacks[from] = {
+            callback = callback,
+            args = {...}
+        }
 
         return
     end
@@ -240,12 +273,12 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.4.9"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.0"))
     end
 )
 
 function HealerHelper:SetSpellForBtn(b, i)
-    HealerHelper:DoAfterCombat(
+    HealerHelper:TryRunSecure(
         function(btn, id)
             btn:SetAttribute("type1", "spell")
             btn:SetAttribute("spell1", id)
@@ -269,7 +302,7 @@ function HealerHelper:SetSpell(btn, id, i)
 end
 
 function HealerHelper:ClearSpellForBtn(b)
-    HealerHelper:DoAfterCombat(
+    HealerHelper:TryRunSecure(
         function(btn)
             btn:SetAttribute("type1", nil)
             btn:SetAttribute("spell1", nil)
@@ -305,20 +338,26 @@ end
 function HealerHelper:GetDispellableDebuffsCount(unit)
     if unit == nil then return 0 end
     local dispellableCount = 0
+    local hasAffix = false
+    local debuffColor = nil
     if AuraUtil.ForEachAura then
         AuraUtil.ForEachAura(
             unit,
             "HARMFUL",
             nil,
             function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod, value1, value2, value3)
-                -- AFFIX
                 if spellId == 440313 then
                     dispellableCount = dispellableCount + 1
-                elseif debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
+                    hasAffix = true
+                    debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellId)
+                elseif debuffType and HealerHelper:CanDispell(debuffType) then
                     dispellableCount = dispellableCount + 1
+                    if not hasAffix then
+                        debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellId)
+                    end
                 end
 
-                return false
+                return false, nil
             end
         )
     else
@@ -327,13 +366,18 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
             -- AFFIX
             if spellId == 440313 then
                 dispellableCount = dispellableCount + 1
-            elseif debuffType == "Magic" or debuffType == "Curse" or debuffType == "Poison" or debuffType == "Disease" then
+                hasAffix = true
+                debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellId)
+            elseif debuffType and HealerHelper:CanDispell(debuffType) then
                 dispellableCount = dispellableCount + 1
+                if not hasAffix then
+                    debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellId)
+                end
             end
         end
     end
 
-    return dispellableCount
+    return dispellableCount, debuffColor
 end
 
 function HealerHelper:RegisterEvent(frame, event, unit)
@@ -470,7 +514,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     )
 
-    HealerHelper:DoAfterCombat(
+    HealerHelper:TryRunSecure(
         function(btn, parent)
             btn:SetAttribute("type", "spell")
             btn:SetAttribute("action", nil)
@@ -485,7 +529,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         "SetAttribute",
         function(sel, key, val)
             if key == "unit" then
-                HealerHelper:DoAfterCombat(
+                HealerHelper:TryRunSecure(
                     function(v)
                         customButton:SetAttribute("unit", v)
                     end, "UnitFrame -> SetAttribute", val
@@ -498,7 +542,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         frame,
         "SetWidth",
         function(sel, w)
-            HealerHelper:DoAfterCombat(
+            HealerHelper:TryRunSecure(
                 function(sw)
                     bar:SetSize(sw, sw / MAXROW * 2)
                     local scale = sw / (customButton:GetWidth() * MAXROW)
@@ -513,7 +557,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         frame,
         "SetSize",
         function(sel, w, h)
-            HealerHelper:DoAfterCombat(
+            HealerHelper:TryRunSecure(
                 function(sw, sh)
                     bar:SetSize(sw, sw / MAXROW * 2)
                     local scale = sw / (customButton:GetWidth() * MAXROW)
@@ -595,84 +639,6 @@ function HealerHelper:AddHealbar(unitFrame)
             HealerHelper:AddActionButton(unitFrame, bar, i)
         end
     end
-end
-
-function HealerHelper:AddDispellBorder(frame)
-    local name = frame:GetName()
-    if name == nil then return end
-    local ActionBarButtonSpellActivationAlert = CreateFrame("Frame", "", frame)
-    ActionBarButtonSpellActivationAlert:SetSize(150, 150)
-    ActionBarButtonSpellActivationAlert:SetPoint("CENTER")
-    local ProcStartFlipbook = ActionBarButtonSpellActivationAlert:CreateTexture(nil, "ARTWORK")
-    ProcStartFlipbook:SetAtlas("UI-HUD-ActionBar-Proc-Start-Flipbook")
-    ProcStartFlipbook:SetSize(150, 150)
-    ProcStartFlipbook:SetPoint("CENTER")
-    ProcStartFlipbook:SetAlpha(1)
-    local ProcLoopFlipbook = ActionBarButtonSpellActivationAlert:CreateTexture(nil, "ARTWORK")
-    ProcLoopFlipbook:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
-    ProcLoopFlipbook:SetAllPoints()
-    ProcLoopFlipbook:SetAlpha(0)
-    local ProcLoop = ProcLoopFlipbook:CreateAnimationGroup()
-    ProcLoop:SetLooping("REPEAT")
-    local ProcLoopAlpha = ProcLoop:CreateAnimation("Alpha")
-    ProcLoopAlpha:SetDuration(0.001)
-    ProcLoopAlpha:SetFromAlpha(1)
-    ProcLoopAlpha:SetToAlpha(1)
-    local ProcLoopFlipAnim = ProcLoop:CreateAnimation("FlipBook")
-    ProcLoopFlipAnim:SetDuration(1)
-    ProcLoopFlipAnim:SetFlipBookRows(6)
-    ProcLoopFlipAnim:SetFlipBookColumns(5)
-    ProcLoopFlipAnim:SetFlipBookFrames(30)
-    local ProcStartAnim = ProcStartFlipbook:CreateAnimationGroup()
-    ProcStartAnim:SetToFinalAlpha(true)
-    local ProcStartAlpha = ProcStartAnim:CreateAnimation("Alpha")
-    ProcStartAlpha:SetDuration(0.001)
-    ProcStartAlpha:SetFromAlpha(1)
-    ProcStartAlpha:SetToAlpha(1)
-    local ProcStartFlipAnim = ProcStartAnim:CreateAnimation("FlipBook")
-    ProcStartFlipAnim:SetDuration(0.7)
-    ProcStartFlipAnim:SetFlipBookRows(6)
-    ProcStartFlipAnim:SetFlipBookColumns(5)
-    ProcStartFlipAnim:SetFlipBookFrames(30)
-    local ProcStartFadeOut = ProcStartAnim:CreateAnimation("Alpha")
-    ProcStartFadeOut:SetDuration(0.001)
-    ProcStartFadeOut:SetOrder(2)
-    ProcStartFadeOut:SetFromAlpha(1)
-    ProcStartFadeOut:SetToAlpha(0)
-    ProcStartAnim:Play()
-    ProcLoop:Play()
-    local sw, sh = frame:GetSize()
-    hooksecurefunc(
-        frame,
-        "SetSize",
-        function(sel, w, h)
-            ActionBarButtonSpellActivationAlert:SetSize(w * 1.6, h * 1.6)
-        end
-    )
-
-    ActionBarButtonSpellActivationAlert:SetSize(sw * 1.6, sh * 1.6)
-    ActionBarButtonSpellActivationAlert:Hide()
-    local function OnDebuffDispellable()
-        local c = HealerHelper:GetDispellableDebuffsCount(frame.unit)
-        if ActionBarButtonSpellActivationAlert then
-            if c > 0 then
-                ActionBarButtonSpellActivationAlert:Show()
-            else
-                ActionBarButtonSpellActivationAlert:Hide()
-            end
-        end
-
-        C_Timer.After(
-            0.1,
-            function()
-                OnDebuffDispellable()
-            end
-        )
-    end
-
-    OnDebuffDispellable()
-
-    return ActionBarButtonSpellActivationAlert
 end
 
 function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func)
