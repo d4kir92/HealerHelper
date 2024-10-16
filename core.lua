@@ -273,7 +273,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.2"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.3"))
     end
 )
 
@@ -285,7 +285,9 @@ function HealerHelper:SetSpellForBtn(b, i)
             btn.spellId = id
             btn.action = 1
             local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
-            btn.icon:SetTexture(iconTexture)
+            if btn.icon then
+                btn.icon:SetTexture(iconTexture)
+            end
         end, "SetSpellForBtn", b, i
     )
 end
@@ -308,7 +310,9 @@ function HealerHelper:ClearSpellForBtn(b)
             btn:SetAttribute("spell1", nil)
             btn.spellId = nil
             btn.action = 1
-            btn.icon:SetTexture(nil)
+            if btn.icon then
+                btn.icon:SetTexture(nil)
+            end
         end, "ClearSpellForBtn", b
     )
 end
@@ -393,7 +397,7 @@ end
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
-    local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "SecureActionButtonTemplate, ActionButtonTemplate")
+    local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "SecureActionButtonTemplate, ActionButtonTemplate, SecureHandlerAttributeTemplate")
     HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_INTERRUPTED", "player")
     HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SUCCEEDED", "player")
     HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_FAILED", "player")
@@ -519,23 +523,33 @@ function HealerHelper:AddActionButton(frame, bar, i)
             btn:SetAttribute("type", "spell")
             btn:SetAttribute("action", nil)
             btn:SetAttribute("action1", nil)
-            btn:SetAttribute("unit", parent.displayedUnit or parent.unit)
             btn:SetAttribute("ignoreModifiers", "true")
         end, "AddActionButton", customButton, frame
     )
 
-    hooksecurefunc(
-        frame,
-        "SetAttribute",
-        function(sel, key, val)
-            if key == "unit" then
-                HealerHelper:TryRunSecure(
-                    function(v)
-                        HealerHelper:UpdateAllowedUnitFrames()
-                        if not HealerHelper:IsAllowed(v) then return end
-                        customButton:SetAttribute("unit", v)
-                    end, "UnitFrame -> SetAttribute", val
-                )
+    customButton:SetFrameRef("unitFrame", frame)
+    customButton:SetAttribute("_onattributechanged", [[
+        if  name == "state-unit" then
+            local unitFrame = self:GetFrameRef("unitFrame")
+      
+            if unitFrame then
+                local unit = unitFrame:GetAttribute("unit")
+                self:SetAttribute("unit", unit)
+            end
+        end
+    ]])
+    RegisterStateDriver(customButton, "unit", "[combat] none; [nocombat] party1")
+    frame:HookScript(
+        "OnAttributeChanged",
+        function(sel, nam, valu)
+            if nam ~= "unit" then
+                print(nam)
+            end
+
+            if nam == "unit" then
+                customButton:SetAttribute("unit", valu)
+            elseif nam == "size" then
+                print(value)
             end
         end
     )
@@ -610,6 +624,56 @@ function HealerHelper:AddActionButton(frame, bar, i)
             end
         end
     )
+
+    local textureScale = 0.048
+    if customButton.NormalTexture then
+        customButton.NormalTexture:SetScale(textureScale)
+    end
+
+    if customButton.HighlightTexture then
+        customButton.HighlightTexture:SetScale(textureScale)
+    end
+
+    if customButton.CheckedTexture then
+        customButton.CheckedTexture:SetScale(textureScale)
+    end
+
+    if customButton.PushedTexture then
+        customButton.PushedTexture:SetScale(textureScale)
+    end
+
+    if customButton.SpellCastAnimFrame then
+        customButton.SpellCastAnimFrame:SetScale(textureScale - 0.002)
+    end
+
+    if customButton.InterruptDisplay then
+        customButton.InterruptDisplay:SetScale(textureScale - 0.002)
+    end
+
+    if customButton.InterruptDisplay then
+        customButton.InterruptDisplay:SetScale(textureScale)
+    end
+
+    if customButton.SlotArt then
+        customButton.SlotArt:SetScale(textureScale)
+    end
+
+    if customButton.SlotBackground then
+        customButton.SlotBackground:SetScale(textureScale)
+    end
+
+    if customButton.Name then
+        customButton.Name:SetScale(textureScale)
+    end
+
+    if customButton.IconMask then
+        customButton.IconMask:SetScale(textureScale)
+    end
+
+    local cooldown = _G[customButton:GetName() .. "Cooldown"]
+    if cooldown then
+        cooldown:SetScale(textureScale)
+    end
 end
 
 local unitFrames = {}
@@ -887,6 +951,8 @@ function HealerHelper:AddTexts(frame)
                     else
                         text:SetText("")
                     end
+                else
+                    text:SetText("")
                 end
             end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0
         )
