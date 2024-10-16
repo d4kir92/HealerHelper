@@ -56,7 +56,13 @@ function HealerHelper:RunAfterCombat()
 end
 
 HealerHelper:RunAfterCombat()
-function HealerHelper:TryRunSecure(callback, from, ...)
+function HealerHelper:TryRunSecure(callback, frame, from, ...)
+    if frame == nil then
+        HealerHelper:MSG("[TryRunSecure] Missing frame for args", ...)
+
+        return
+    end
+
     if from == nil then
         HealerHelper:MSG("[TryRunSecure] Missing name for args", ...)
 
@@ -64,7 +70,7 @@ function HealerHelper:TryRunSecure(callback, from, ...)
     end
 
     local args = {...}
-    if InCombatLockdown() then
+    if InCombatLockdown() and frame:IsProtected() then
         callbacks[from] = {
             callback = callback,
             args = {...}
@@ -273,11 +279,12 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.3"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.4"))
     end
 )
 
 function HealerHelper:SetSpellForBtn(b, i)
+    if b == nil then return end
     HealerHelper:TryRunSecure(
         function(btn, id)
             btn:SetAttribute("type1", "spell")
@@ -288,7 +295,7 @@ function HealerHelper:SetSpellForBtn(b, i)
             if btn.icon then
                 btn.icon:SetTexture(iconTexture)
             end
-        end, "SetSpellForBtn", b, i
+        end, b, "SetSpellForBtn", b, i
     )
 end
 
@@ -304,6 +311,7 @@ function HealerHelper:SetSpell(btn, id, i)
 end
 
 function HealerHelper:ClearSpellForBtn(b)
+    if b == nil then return end
     HealerHelper:TryRunSecure(
         function(btn)
             btn:SetAttribute("type1", nil)
@@ -313,7 +321,7 @@ function HealerHelper:ClearSpellForBtn(b)
             if btn.icon then
                 btn.icon:SetTexture(nil)
             end
-        end, "ClearSpellForBtn", b
+        end, b, "ClearSpellForBtn", b
     )
 end
 
@@ -518,14 +526,16 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     )
 
-    HealerHelper:TryRunSecure(
-        function(btn, parent)
-            btn:SetAttribute("type", "spell")
-            btn:SetAttribute("action", nil)
-            btn:SetAttribute("action1", nil)
-            btn:SetAttribute("ignoreModifiers", "true")
-        end, "AddActionButton", customButton, frame
-    )
+    if customButton then
+        HealerHelper:TryRunSecure(
+            function(btn, parent)
+                btn:SetAttribute("type", "spell")
+                btn:SetAttribute("action", nil)
+                btn:SetAttribute("action1", nil)
+                btn:SetAttribute("ignoreModifiers", "true")
+            end, customButton, "AddActionButton", customButton, frame
+        )
+    end
 
     customButton:SetFrameRef("unitFrame", frame)
     customButton:SetAttribute("_onattributechanged", [[
@@ -542,14 +552,9 @@ function HealerHelper:AddActionButton(frame, bar, i)
     frame:HookScript(
         "OnAttributeChanged",
         function(sel, nam, valu)
-            if nam ~= "unit" then
-                print(nam)
-            end
-
+            if InCombatLockdown() and sel:IsProtected() then return false end
             if nam == "unit" then
                 customButton:SetAttribute("unit", valu)
-            elseif nam == "size" then
-                print(value)
             end
         end
     )
@@ -558,14 +563,16 @@ function HealerHelper:AddActionButton(frame, bar, i)
         frame,
         "SetWidth",
         function(sel, w)
-            HealerHelper:TryRunSecure(
-                function(sw)
-                    bar:SetSize(sw, sw / MAXROW * 2)
-                    local scale = sw / (customButton:GetWidth() * MAXROW)
-                    customButton:SetScale(scale)
-                    HealerHelper:HandleBtn(bar, customButton, i)
-                end, "UnitFrame -> SetWidth", w
-            )
+            if customButton then
+                HealerHelper:TryRunSecure(
+                    function(sw)
+                        bar:SetSize(sw, sw / MAXROW * 2)
+                        local scale = sw / (customButton:GetWidth() * MAXROW)
+                        customButton:SetScale(scale)
+                        HealerHelper:HandleBtn(bar, customButton, i)
+                    end, customButton, "UnitFrame -> SetWidth", w
+                )
+            end
         end
     )
 
@@ -573,14 +580,16 @@ function HealerHelper:AddActionButton(frame, bar, i)
         frame,
         "SetSize",
         function(sel, w, h)
-            HealerHelper:TryRunSecure(
-                function(sw, sh)
-                    bar:SetSize(sw, sw / MAXROW * 2)
-                    local scale = sw / (customButton:GetWidth() * MAXROW)
-                    customButton:SetScale(scale)
-                    HealerHelper:HandleBtn(bar, customButton, i)
-                end, "UnitFrame -> SetSize", w, h
-            )
+            if customButton then
+                HealerHelper:TryRunSecure(
+                    function(sw, sh)
+                        bar:SetSize(sw, sw / MAXROW * 2)
+                        local scale = sw / (customButton:GetWidth() * MAXROW)
+                        customButton:SetScale(scale)
+                        HealerHelper:HandleBtn(bar, customButton, i)
+                    end, customButton, "UnitFrame -> SetSize", w, h
+                )
+            end
         end
     )
 
