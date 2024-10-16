@@ -3088,7 +3088,7 @@ function D4:GetRealmLang(realmName)
     if realms[realmName] == nil then
         if missingRealms[realmName] == nil then
             missingRealms[realmName] = true
-            D4:MSG("[D4] Missing Realmname", realmName)
+            --[[D4:MSG("[D4] Missing Realmname", realmName)]]
         end
 
         return ""

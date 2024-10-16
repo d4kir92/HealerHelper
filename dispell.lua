@@ -120,7 +120,7 @@ function HealerHelper:AddDispellBorder(frame)
         end
 
         C_Timer.After(
-            0.1,
+            0.2,
             function()
                 OnDebuffDispellable()
             end

@@ -139,7 +139,7 @@ healerHelper:SetScript(
         local function UpdateFramePosition(frame, i, group)
             if InCombatLockdown() then
                 C_Timer.After(
-                    0.1,
+                    0.2,
                     function()
                         UpdateFramePosition(frame, i, group)
                     end
@@ -279,7 +279,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.4"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.5"))
     end
 )
 
@@ -743,7 +743,7 @@ function HealerHelper:AddHealbar(unitFrame)
     end
 end
 
-function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func)
+function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func, updateDelay)
     local icon = frame:CreateTexture()
     if atlas then
         icon:SetAtlas(atlas)
@@ -756,7 +756,7 @@ function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func)
     local function OnUpdateIcon(parent, ico)
         func(parent, ico)
         C_Timer.After(
-            0.1,
+            updateDelay,
             function()
                 OnUpdateIcon(parent, ico)
             end
@@ -786,9 +786,10 @@ function HealerHelper:AddIcons(frame)
             else
                 icon:SetAlpha(0)
             end
-        end
+        end, 1
     )
 
+    local oldRaidTarget = nil
     HealerHelper:AddIcon(
         frame,
         nil,
@@ -800,12 +801,15 @@ function HealerHelper:AddIcons(frame)
         0,
         function(parent, icon)
             if parent.unit == nil then return end
-            if GetRaidTargetIndex(parent.unit) then
-                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
-            else
-                icon:SetTexture(nil)
+            if oldRaidTarget ~= GetRaidTargetIndex(parent.unit) then
+                oldRaidTarget = GetRaidTargetIndex(parent.unit)
+                if GetRaidTargetIndex(parent.unit) then
+                    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
+                else
+                    icon:SetTexture(nil)
+                end
             end
-        end
+        end, 0.1
     )
 
     HealerHelper:AddIcon(
@@ -854,13 +858,13 @@ function HealerHelper:AddIcons(frame)
             else
                 icon:SetTexture(nil)
             end
-        end
+        end, 0.3
     )
 
     HealerHelper:AddDispellBorder(frame)
 end
 
-function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5)
+function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5, updateDelay)
     local t = frame:CreateFontString("_UnitLevel", "OVERLAY", "GameTooltipText")
     local f1, _, f3 = t:GetFont()
     t:SetFont(f1, ts, f3)
@@ -868,7 +872,7 @@ function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5)
     local function OnTextUpdate(parent, text)
         func(parent, text)
         C_Timer.After(
-            0.1,
+            updateDelay,
             function()
                 OnTextUpdate(parent, text)
             end
@@ -923,7 +927,7 @@ function HealerHelper:AddTexts(frame)
                 else
                     text:SetText(t)
                 end
-            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1
         )
 
         HealerHelper:AddTextStr(
@@ -963,7 +967,7 @@ function HealerHelper:AddTexts(frame)
                 else
                     text:SetText("")
                 end
-            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1
         )
     end
 end
