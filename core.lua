@@ -273,7 +273,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.1"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.2"))
     end
 )
 
@@ -531,6 +531,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
             if key == "unit" then
                 HealerHelper:TryRunSecure(
                     function(v)
+                        HealerHelper:UpdateAllowedUnitFrames()
+                        if not HealerHelper:IsAllowed(v) then return end
                         customButton:SetAttribute("unit", v)
                     end, "UnitFrame -> SetAttribute", val
                 )
@@ -610,6 +612,32 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 end
 
+local unitFrames = {}
+function HealerHelper:UpdateAllowedUnitFrames()
+    for i = 1, 40 do
+        if i <= 5 then
+            HealerHelper:AddUnitFrame("CompactPartyFrameMember" .. i)
+            HealerHelper:AddUnitFrame("CompactPartyFramePet" .. i)
+            HealerHelper:AddUnitFrame("CompactArenaFrameMember" .. i)
+            HealerHelper:AddUnitFrame("CompactArenaFramePet" .. i)
+        end
+
+        HealerHelper:AddUnitFrame("CompactRaidFrame" .. i)
+        HealerHelper:AddUnitFrame("CompactRaidGroup" .. i)
+    end
+end
+
+function HealerHelper:AddUnitFrame(name)
+    local uf = _G[name]
+    if uf and unitFrames[uf] == nil then
+        unitFrames[uf] = name
+    end
+end
+
+function HealerHelper:IsAllowed(uf)
+    return unitFrames[uf] ~= nil
+end
+
 function HealerHelper:AddHealbar(unitFrame)
     if unitFrame == nil then
         HealerHelper:MSG("Error: 'unitFrame' is nil")
@@ -623,7 +651,8 @@ function HealerHelper:AddHealbar(unitFrame)
         return
     end
 
-    if not unitFrame.GetName or unitFrame:GetName(unitFrame) == nil then return end
+    HealerHelper:UpdateAllowedUnitFrames()
+    if not HealerHelper:IsAllowed(unitFrame) then return end
     local name = unitFrame:GetName()
     if name ~= nil then
         local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame)
