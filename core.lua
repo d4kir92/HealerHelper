@@ -82,6 +82,30 @@ function HealerHelper:TryRunSecure(callback, frame, from, ...)
     callback(unpack(args))
 end
 
+local function FindDirection()
+    if IsInRaid() then
+        if CompactRaidFrameContainer.flowOrientation == "vertical" then
+            return "DOWN"
+        else
+            return "RIGHT"
+        end
+    elseif IsInGroup() then
+        local frame = CompactPartyFrame
+        if frame == nil then
+            frame = CompactRaidFrameContainer
+        end
+
+        local sw, sh = frame:GetSize()
+        if sw > sh then
+            return "RIGHT"
+        else
+            return "DOWN"
+        end
+    end
+
+    return "FAILED"
+end
+
 local healerHelper = CreateFrame("Frame")
 healerHelper:RegisterEvent("ADDON_LOADED")
 healerHelper:SetScript(
@@ -112,30 +136,6 @@ healerHelper:SetScript(
             end
         )
 
-        local function FindDirection()
-            if IsInRaid() then
-                if CompactRaidFrameContainer.flowOrientation == "vertical" then
-                    return "DOWN"
-                else
-                    return "RIGHT"
-                end
-            elseif IsInGroup() then
-                local frame = CompactPartyFrame
-                if frame == nil then
-                    frame = CompactRaidFrameContainer
-                end
-
-                local sw, sh = frame:GetSize()
-                if sw > sh then
-                    return "RIGHT"
-                else
-                    return "DOWN"
-                end
-            end
-
-            return "FAILED"
-        end
-
         local function UpdateFramePosition(frame, i, group)
             if InCombatLockdown() then
                 C_Timer.After(
@@ -148,7 +148,7 @@ healerHelper:SetScript(
                 return
             end
 
-            if frame:GetName() and (string.match(frame:GetName(), "CompactRaidFrame") or string.match(frame:GetName(), "CompactPartyFrameMember") or string.match(frame:GetName(), "CompactRaidGroup")) then
+            if string.match(frame:GetName(), "CompactRaidFrame") or string.match(frame:GetName(), "CompactPartyFrameMember") or string.match(frame:GetName(), "CompactRaidGroup") then
                 local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
                 if bar then
                     if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
@@ -279,7 +279,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.5"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.6"))
     end
 )
 
@@ -333,17 +333,6 @@ function HealerHelper:ClearSpell(btn, i)
 
     for x, v in pairs(actionbuttons[i]) do
         HealerHelper:ClearSpellForBtn(v)
-    end
-end
-
-function HealerHelper:HandleBtn(bar, btn, i)
-    if not InCombatLockdown() then
-        btn:ClearAllPoints()
-        if i > MAXROW then
-            btn:SetPoint("TOPLEFT", bar, "TOPLEFT", (i - 1 - MAXROW) * btn:GetWidth(), -btn:GetHeight())
-        else
-            btn:SetPoint("TOPLEFT", bar, "TOPLEFT", (i - 1) * btn:GetWidth(), 0)
-        end
     end
 end
 
@@ -537,58 +526,50 @@ function HealerHelper:AddActionButton(frame, bar, i)
         )
     end
 
-    customButton:SetFrameRef("unitFrame", frame)
-    customButton:SetAttribute("_onattributechanged", [[
-        if  name == "state-unit" then
-            local unitFrame = self:GetFrameRef("unitFrame")
-      
-            if unitFrame then
-                local unit = unitFrame:GetAttribute("unit")
-                self:SetAttribute("unit", unit)
-            end
-        end
-    ]])
-    RegisterStateDriver(customButton, "unit", "[combat] none; [nocombat] party1")
+    HealerHelper:TryRunSecure(
+        function(btn, parent)
+            btn:SetFrameRef("unitFrame", parent)
+            btn:SetFrameRef("bar", bar)
+            btn:SetAttribute("MAXROW", MAXROW)
+            btn:SetAttribute("i", i)
+            btn:SetAttribute("_onattributechanged", [[
+                local unitFrame = self:GetFrameRef("unitFrame")
+
+                if unitFrame then
+                    local bar = self:GetFrameRef("bar")
+                    local MAXROW = self:GetAttribute("MAXROW")
+                    local i = self:GetAttribute("i")
+
+                    local sw, sh = unitFrame:GetWidth(), unitFrame:GetHeight()
+                    bar:SetWidth(sw)
+                    bar:SetHeight(sw / MAXROW * 2)
+                    local scale = sw / (self:GetWidth() * MAXROW)
+                    self:SetScale(scale)
+                    self:ClearAllPoints()
+                    if i > MAXROW then
+                        self:SetPoint("TOPLEFT", bar, "TOPLEFT", (i - 1 - MAXROW) * self:GetWidth(), -self:GetHeight())
+                    else
+                        self:SetPoint("TOPLEFT", bar, "TOPLEFT", (i - 1) * self:GetWidth(), 0)
+                    end
+
+                    if name == "state-unit" then
+                        local unit = unitFrame:GetAttribute("unit")
+                        self:SetAttribute("unit", unit)
+                    end
+                end
+            ]])
+            RegisterStateDriver(btn, "unit", "[combat] none; [nocombat] party1")
+            RegisterStateDriver(btn, "visibility", "show;hide")
+        end, customButton, "SecureActionButtons", customButton, frame
+    )
+
     frame:HookScript(
         "OnAttributeChanged",
         function(sel, nam, valu)
+            if sel == nil then return end
             if InCombatLockdown() and sel:IsProtected() then return false end
             if nam == "unit" then
                 customButton:SetAttribute("unit", valu)
-            end
-        end
-    )
-
-    hooksecurefunc(
-        frame,
-        "SetWidth",
-        function(sel, w)
-            if customButton then
-                HealerHelper:TryRunSecure(
-                    function(sw)
-                        bar:SetSize(sw, sw / MAXROW * 2)
-                        local scale = sw / (customButton:GetWidth() * MAXROW)
-                        customButton:SetScale(scale)
-                        HealerHelper:HandleBtn(bar, customButton, i)
-                    end, customButton, "UnitFrame -> SetWidth", w
-                )
-            end
-        end
-    )
-
-    hooksecurefunc(
-        frame,
-        "SetSize",
-        function(sel, w, h)
-            if customButton then
-                HealerHelper:TryRunSecure(
-                    function(sw, sh)
-                        bar:SetSize(sw, sw / MAXROW * 2)
-                        local scale = sw / (customButton:GetWidth() * MAXROW)
-                        customButton:SetScale(scale)
-                        HealerHelper:HandleBtn(bar, customButton, i)
-                    end, customButton, "UnitFrame -> SetSize", w, h
-                )
             end
         end
     )
@@ -599,7 +580,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
         HealerHelper:ClearSpell(customButton, i)
     end
 
-    HealerHelper:HandleBtn(frame, customButton, i)
     customButton:RegisterForDrag("LeftButton")
     customButton:RegisterForClicks("AnyUp", "AnyDown")
     customButton:SetScript(
@@ -728,7 +708,7 @@ function HealerHelper:AddHealbar(unitFrame)
     if not HealerHelper:IsAllowed(unitFrame) then return end
     local name = unitFrame:GetName()
     if name ~= nil then
-        local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame)
+        local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame, "SecureHandlerAttributeTemplate")
         bar:SetSize(10, 10)
         bar:SetPoint("CENTER", unitFrame, "CENTER", 0, 0)
         if DEBUG then
@@ -743,7 +723,19 @@ function HealerHelper:AddHealbar(unitFrame)
     end
 end
 
-function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func, updateDelay)
+function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func, updateDelay, updateDelayRaid)
+    if updateDelay == nil then
+        HealerHelper:MSG("[AddIcon] Missing updateDelay")
+
+        return
+    end
+
+    if updateDelayRaid == nil then
+        HealerHelper:MSG("[AddIcon] Missing updateDelayRaid")
+
+        return
+    end
+
     local icon = frame:CreateTexture()
     if atlas then
         icon:SetAtlas(atlas)
@@ -755,8 +747,13 @@ function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func, u
     icon:SetPoint(p1, p2, p3, p4, p5)
     local function OnUpdateIcon(parent, ico)
         func(parent, ico)
+        local delay = updateDelay
+        if IsInRaid() then
+            delay = updateDelayRaid
+        end
+
         C_Timer.After(
-            updateDelay,
+            delay,
             function()
                 OnUpdateIcon(parent, ico)
             end
@@ -786,7 +783,7 @@ function HealerHelper:AddIcons(frame)
             else
                 icon:SetAlpha(0)
             end
-        end, 1
+        end, 0.5, 1.5
     )
 
     local oldRaidTarget = nil
@@ -809,7 +806,7 @@ function HealerHelper:AddIcons(frame)
                     icon:SetTexture(nil)
                 end
             end
-        end, 0.1
+        end, 0.2, 0.4
     )
 
     HealerHelper:AddIcon(
@@ -858,21 +855,38 @@ function HealerHelper:AddIcons(frame)
             else
                 icon:SetTexture(nil)
             end
-        end, 0.3
+        end, 1, 2
     )
 
     HealerHelper:AddDispellBorder(frame)
 end
 
-function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5, updateDelay)
+function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5, updateDelay, updateDelayRaid)
+    if updateDelay == nil then
+        HealerHelper:MSG("[AddTextStr] Missing updateDelay")
+
+        return
+    end
+
+    if updateDelayRaid == nil then
+        HealerHelper:MSG("[AddTextStr] Missing updateDelayRaid")
+
+        return
+    end
+
     local t = frame:CreateFontString("_UnitLevel", "OVERLAY", "GameTooltipText")
     local f1, _, f3 = t:GetFont()
     t:SetFont(f1, ts, f3)
     t:SetPoint(p1, p2, p3, p4, p5)
     local function OnTextUpdate(parent, text)
         func(parent, text)
+        local delay = updateDelay
+        if IsInRaid() then
+            delay = updateDelayRaid
+        end
+
         C_Timer.After(
-            updateDelay,
+            delay,
             function()
                 OnTextUpdate(parent, text)
             end
@@ -927,12 +941,18 @@ function HealerHelper:AddTexts(frame)
                 else
                     text:SetText(t)
                 end
-            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1, 2
         )
 
         HealerHelper:AddTextStr(
             frame,
             function(parent, text)
+                if IsInRaid() then
+                    text:SetText("")
+
+                    return
+                end
+
                 if InCombatLockdown() then
                     text:SetText("")
 
@@ -967,7 +987,7 @@ function HealerHelper:AddTexts(frame)
                 else
                     text:SetText("")
                 end
-            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1, 2
         )
     end
 end
