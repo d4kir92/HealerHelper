@@ -127,7 +127,8 @@ healerHelper:SetScript(
         hooksecurefunc(
             "CompactUnitFrame_SetUpFrame",
             function(frame, func)
-                if frame ~= nil and healBars[frame] == nil then
+                HealerHelper:UpdateAllowedUnitFrames()
+                if frame ~= nil and HealerHelper:IsAllowed(frame) and healBars[frame] == nil then
                     healBars[frame] = true
                     HealerHelper:AddHealbar(frame)
                     HealerHelper:AddIcons(frame)
@@ -148,7 +149,7 @@ healerHelper:SetScript(
                 return
             end
 
-            if string.match(frame:GetName(), "CompactRaidFrame") or string.match(frame:GetName(), "CompactPartyFrameMember") or string.match(frame:GetName(), "CompactRaidGroup") then
+            if frame ~= nil and HealerHelper:IsAllowed(frame) then
                 local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
                 if bar then
                     if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
@@ -279,7 +280,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.5.6"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.5.7"))
     end
 )
 
@@ -666,6 +667,13 @@ function HealerHelper:AddActionButton(frame, bar, i)
 end
 
 local unitFrames = {}
+function HealerHelper:AddUnitFrame(name)
+    local uf = _G[name]
+    if uf and unitFrames[uf] == nil then
+        unitFrames[uf] = name
+    end
+end
+
 function HealerHelper:UpdateAllowedUnitFrames()
     for i = 1, 40 do
         if i <= 5 then
@@ -677,13 +685,6 @@ function HealerHelper:UpdateAllowedUnitFrames()
 
         HealerHelper:AddUnitFrame("CompactRaidFrame" .. i)
         HealerHelper:AddUnitFrame("CompactRaidGroup" .. i)
-    end
-end
-
-function HealerHelper:AddUnitFrame(name)
-    local uf = _G[name]
-    if uf and unitFrames[uf] == nil then
-        unitFrames[uf] = name
     end
 end
 
