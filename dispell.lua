@@ -135,9 +135,9 @@ end
 function HealerHelper:CanDispell(debuffType)
     local _, className = UnitClass("player")
     for i, tab in pairs(dispells[className]) do
-        for spellId, typ in pairs(tab) do
+        for spellID, typ in pairs(tab) do
             if typ == debuffType then
-                local name = C_Spell.GetSpellInfo(spellId)
+                local name = C_Spell.GetSpellInfo(spellID)
                 if name then return true end
             end
         end
@@ -177,8 +177,8 @@ function HealerHelper:FoundDispellable()
     )
 end
 
-function HealerHelper:GetDebuffTypeColor(debuffType, spellId)
-    if spellId == 440313 then
+function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
+    if spellID == 440313 then
         local _, className = UnitClass("player")
         if affixClasses[className] then
             HealerHelper:FoundDispellable()

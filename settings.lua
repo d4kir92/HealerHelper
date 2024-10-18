@@ -9,14 +9,14 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion("HealerHelper", "134149", "0.5.7")
+    HealerHelper:SetVersion("HealerHelper", "134149", "0.6.0")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
             ["pTab"] = {"CENTER"},
             ["sw"] = 520,
             ["sh"] = 520,
-            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.5.7")
+            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.6.0")
         }
     )
 
@@ -52,6 +52,30 @@ function HealerHelper:InitSettings()
             ["BOTTOM"] = "BOTTOM",
             ["RIGHT"] = "RIGHT"
         },
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
+    )
+
+    HealerHelper:AppendSlider(
+        "ACTIONBUTTONPERROW",
+        5,
+        1,
+        6,
+        1,
+        0,
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
+    )
+
+    HealerHelper:AppendSlider(
+        "ROWS",
+        2,
+        1,
+        6,
+        1,
+        0,
         function()
             HealerHelper:UpdateHealBarsLayout()
         end
@@ -107,6 +131,30 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendSlider(
+        "RACTIONBUTTONPERROW",
+        5,
+        1,
+        6,
+        1,
+        0,
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
+    )
+
+    HealerHelper:AppendSlider(
+        "RROWS",
+        2,
+        1,
+        6,
+        1,
+        0,
+        function()
+            HealerHelper:UpdateHealBarsLayout()
+        end
+    )
+
+    HealerHelper:AppendSlider(
         "ROFFSET",
         2,
         0,
@@ -149,7 +197,7 @@ function HealerHelper:InitSettings()
             ["name"] = "HealerHelper",
             ["icon"] = 134149,
             ["dbtab"] = HEAHELPC,
-            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.5.72"}, {"Leftclick", "Toggle Settings"}},
+            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.6.02"}, {"Leftclick", "Toggle Settings"}},
             ["funcL"] = function()
                 HealerHelper:ToggleSettings()
             end,
