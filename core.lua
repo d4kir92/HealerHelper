@@ -39,17 +39,30 @@ function HealerHelper:AddUnitFrame(name)
 end
 
 function HealerHelper:UpdateAllowedUnitFrames()
+    local c = 0
     for i = 1, 40 do
         if i <= 5 then
-            HealerHelper:AddUnitFrame("CompactPartyFrameMember" .. i)
-            HealerHelper:AddUnitFrame("CompactArenaFrameMember" .. i)
+            if HealerHelper:AddUnitFrame("CompactPartyFrameMember" .. i) then
+                c = c + 1
+            end
+
+            if HealerHelper:AddUnitFrame("CompactArenaFrameMember" .. i) then
+                c = c + 1
+            end
+
             for x = 1, 5 do
-                HealerHelper:AddUnitFrame("CompactRaidGroup" .. i .. "Member" .. x)
+                if HealerHelper:AddUnitFrame("CompactRaidGroup" .. i .. "Member" .. x) then
+                    c = c + 1
+                end
             end
         end
 
-        HealerHelper:AddUnitFrame("CompactRaidFrame" .. i)
+        if HealerHelper:AddUnitFrame("CompactRaidFrame" .. i) then
+            c = c + 1
+        end
     end
+
+    return c
 end
 
 function HealerHelper:IsAllowed(uf)
@@ -165,37 +178,7 @@ healerHelper:SetScript(
         HealerHelper:SetAddonOutput("HealerHelper", "134149")
         HealerHelper:InitSettings()
         local healBars = {}
-        hooksecurefunc(
-            "CompactUnitFrame_SetUpFrame",
-            function(frame, func)
-                if ignoreFrames[frame] then return end
-                if frame ~= nil and healBars[frame] == nil then
-                    HealerHelper:UpdateAllowedUnitFrames()
-                    if HealerHelper:IsAllowed(frame) then
-                        healBars[frame] = true
-                        HealerHelper:AddHealbar(frame)
-                        HealerHelper:AddIcons(frame)
-                        HealerHelper:AddTexts(frame)
-                        HealerHelper:UpdateHealBarsLayout()
-                        C_Timer.After(
-                            0.1,
-                            function()
-                                hooksecurefunc(
-                                    frame,
-                                    "SetPoint",
-                                    function()
-                                        HealerHelper:UpdateHealBarsLayout()
-                                    end
-                                )
-                            end
-                        )
-                    else
-                        ignoreFrames[frame] = true
-                    end
-                end
-            end
-        )
-
+        local test = false
         local currentlyUpdating = {}
         local function UpdateFramePosition(frame, i, group)
             if InCombatLockdown() and frame:IsProtected() then
@@ -303,7 +286,6 @@ healerHelper:SetScript(
             UpdateFramePosition(frame, i, group)
         end
 
-        local test = false
         function HealerHelper:UpdateHealBarsLayout()
             if test then return end
             test = true
@@ -346,6 +328,33 @@ healerHelper:SetScript(
             test = false
         end
 
+        function HealerHelper:CheckForNewFrames()
+            local c = HealerHelper:UpdateAllowedUnitFrames()
+            if c > 0 then
+                for frame, name in pairs(unitFrames) do
+                    if frame ~= nil and healBars[frame] == nil then
+                        healBars[frame] = true
+                        HealerHelper:AddHealbar(frame)
+                        HealerHelper:AddIcons(frame)
+                        HealerHelper:AddTexts(frame)
+                        HealerHelper:UpdateHealBarsLayout()
+                    end
+                end
+            end
+
+            if HealerHelper.DEBUG then
+                HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After 1 CheckForNewFrames")
+            end
+
+            C_Timer.After(
+                1,
+                function()
+                    HealerHelper:CheckForNewFrames()
+                end
+            )
+        end
+
+        HealerHelper:CheckForNewFrames()
         C_Timer.After(
             0.21,
             function()
@@ -353,7 +362,7 @@ healerHelper:SetScript(
             end
         )
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.6.1"))
+        HealerHelper:MSG(string.format("LOADED v%s", "0.6.2"))
     end
 )
 
@@ -623,7 +632,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
             btn:SetFrameRef("bar", bar)
             btn:SetAttribute("i", i)
             btn:SetFrameRef("HEAHEL_HIDDEN", parent)
-            btn:SetAttribute("_onattributechanged", [[
+            btn:SetAttribute("_onattributechanged", [[                   
                 if self:GetAttribute("HEAHEL_ignore") then
                     return
                 end
@@ -638,9 +647,16 @@ function HealerHelper:AddActionButton(frame, bar, i)
                     local unitFrame = self:GetFrameRef("unitFrame")                
                     if unitFrame and unitFrame:IsShown() then
                         local i = self:GetAttribute("i")
+                        local ACTIONBUTTONPERROW = self:GetAttribute("ACTIONBUTTONPERROW")
+                        local ROWS = self:GetAttribute("ROWS")
+                        if i > ACTIONBUTTONPERROW * ROWS then
+                            return 
+                        end
+                        
                         local p1, p2, p3, p4, p5 = unitFrame:GetPoint()
                         local sw = unitFrame:GetWidth()
                         local sh = unitFrame:GetHeight()
+                    
                         if self:GetAttribute("HEAHEL_changed") or sw ~= unitFrame:GetAttribute(i .. "sw") or sh ~= unitFrame:GetAttribute(i .. "sh") or p1 ~= unitFrame:GetAttribute(i .. "p1") or p2 ~= unitFrame:GetAttribute(i .. "p2") or p3 ~= unitFrame:GetAttribute(i .. "p3") or p4 ~= unitFrame:GetAttribute(i .. "p4") or p5 ~= unitFrame:GetAttribute(i .. "p5") then
                             self:SetAttribute("HEAHEL_changed", false)
                             unitFrame:SetAttribute(i .. "sw", sw)
@@ -652,9 +668,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                             unitFrame:SetAttribute(i .. "p4", p4)
                             unitFrame:SetAttribute(i .. "p5", p5)
 
-                            local bar = self:GetFrameRef("bar")
-                            local ACTIONBUTTONPERROW = self:GetAttribute("ACTIONBUTTONPERROW")
-                            local ROWS = self:GetAttribute("ROWS")
+                            local bar = self:GetFrameRef("bar")                          
 
                             local sw, sh = unitFrame:GetWidth(), unitFrame:GetHeight()
                             bar:SetWidth(sw)
