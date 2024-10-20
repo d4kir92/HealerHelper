@@ -6,6 +6,7 @@ local ActionButtonCastType = {
 }
 
 local actionbuttons = {}
+local healBars = {}
 local HEAHEL_HIDDEN = CreateFrame("Frame", "HEAHEL_HIDDEN")
 HEAHEL_HIDDEN:Hide()
 function HealerHelper:GetOptionValue(name)
@@ -70,15 +71,15 @@ function HealerHelper:IsAllowed(uf)
 end
 
 local callbacks = {}
+local runAfter = false
 function HealerHelper:RunAfterCombat()
+    if runAfter then return end
+    runAfter = true
     if InCombatLockdown() then
-        if HealerHelper.DEBUG then
-            HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After 0.1 RunAfterCombat #1")
-        end
-
         C_Timer.After(
             0.1,
             function()
+                runAfter = false
                 HealerHelper:RunAfterCombat()
             end
         )
@@ -93,15 +94,13 @@ function HealerHelper:RunAfterCombat()
     end
 
     callbacks = {}
-    if HealerHelper.DEBUG then
-        HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After 0.5 RunAfterCombat #2")
-    end
-    --[[C_Timer.After(
+    C_Timer.After(
         0.5,
         function()
+            runAfter = false
             HealerHelper:RunAfterCombat()
         end
-    )]]
+    )
 end
 
 HealerHelper:RunAfterCombat()
@@ -155,214 +154,276 @@ local function FindDirection()
     return "FAILED"
 end
 
-local ignoreFrames = {}
-local healerHelper = CreateFrame("Frame")
-healerHelper:RegisterEvent("ADDON_LOADED")
-healerHelper:SetScript(
-    "OnEvent",
-    function(sel, event, addonName)
-        if addonName ~= AddonName then return end
-        HEAHELPC = HEAHELPC or {}
-        HEAHELPC["LAYOUT"] = HEAHELPC["LAYOUT"] or "BOTTOM"
-        HEAHELPC["GAPX"] = HEAHELPC["GAPX"] or 6
-        HEAHELPC["GAPY"] = HEAHELPC["GAPY"] or 6
-        HEAHELPC["OFFSET"] = HEAHELPC["OFFSET"] or 2
-        HEAHELPC["RLAYOUT"] = HEAHELPC["RLAYOUT"] or "BOTTOM"
-        HEAHELPC["RGAPX"] = HEAHELPC["RGAPX"] or 4
-        HEAHELPC["RGAPY"] = HEAHELPC["RGAPY"] or 4
-        HEAHELPC["ROFFSET"] = HEAHELPC["ROFFSET"] or 0
-        HEAHELPC["ROWS"] = HEAHELPC["ROWS"] or 2
-        HEAHELPC["ACTIONBUTTONPERROW"] = HEAHELPC["ACTIONBUTTONPERROW"] or 5
-        HEAHELPC["RROWS"] = HEAHELPC["RROWS"] or 2
-        HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
-        HealerHelper:SetAddonOutput("HealerHelper", "134149")
-        HealerHelper:InitSettings()
-        local healBars = {}
-        local test = false
-        local currentlyUpdating = {}
-        local function UpdateFramePosition(frame, i, group)
-            if InCombatLockdown() and frame:IsProtected() then
-                if HealerHelper.DEBUG then
-                    HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After 0.1 UpdateFramePosition")
-                end
+function HealerHelper:RegisterEvent(frame, event, unit)
+    if C_EventUtils.IsEventValid(event) then
+        if unit then
+            frame:RegisterUnitEvent(event, "player")
+        else
+            frame:RegisterEvent(event)
+        end
+    else
+        HealerHelper:MSG("Missing event", event, unit)
+    end
+end
 
-                C_Timer.After(
-                    0.1,
-                    function()
-                        UpdateFramePosition(frame, i, group)
-                    end
-                )
+local previousGroupSize = 0
+local searchForNew = false
+function HealerHelper:CheckForNewFrames(oldc)
+    if searchForNew then return end
+    searchForNew = true
+    if oldc and oldc == 0 then
+        HealerHelper:UpdateHealBarsLayout()
+    end
 
-                return
+    local c = oldc or HealerHelper:UpdateAllowedUnitFrames()
+    if c > 0 or (oldc ~= nil and oldc > 0) then
+        local i = 0
+        for frame, name in pairs(unitFrames) do
+            if frame ~= nil and healBars[frame] == nil then
+                healBars[frame] = true
+                HealerHelper:AddIcons(frame)
+                HealerHelper:AddTexts(frame)
+                HealerHelper:AddHealbar(frame)
+                i = i + 1
+                if i >= 15 then break end
             end
-
-            if frame ~= nil and HealerHelper:IsAllowed(frame) then
-                local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
-                if bar then
-                    if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
-                        if bar then
-                            bar:ClearAllPoints()
-                            bar:SetPoint("TOP", frame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
-                        end
-                    elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                        if bar then
-                            bar:ClearAllPoints()
-                            bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
-                        end
-                    else
-                        HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
-                    end
-
-                    local direction = FindDirection()
-                    local spacingY = 0
-                    local spacingX = 0
-                    local y = i % 5
-                    if y == 0 then
-                        y = 5
-                    end
-
-                    local previousFrame = nil
-                    if string.match(frame:GetName(), "CompactPartyFrameMember") then
-                        previousFrame = _G["CompactPartyFrameMember" .. (i - 1)]
-                    elseif string.match(frame:GetName(), "CompactRaidFrame") then
-                        previousFrame = _G["CompactRaidFrame" .. (i - 1)]
-                    elseif string.match(frame:GetName(), "CompactRaidGroup") then
-                        previousFrame = _G["CompactRaidGroup" .. group .. "Member" .. (i - 1)]
-                    end
-
-                    if y == 1 then
-                        previousFrame = _G["CompactRaidFrame" .. (i - 5)]
-                        if previousFrame == nil and group ~= nil then
-                            previousFrame = _G["CompactRaidGroup" .. (group - 1) .. "Member1"]
-                        end
-
-                        if previousFrame then
-                            frame:ClearAllPoints()
-                            if direction == "DOWN" then
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                                    frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                                else
-                                    frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                                end
-                            else
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
-                                else
-                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
-                                end
-                            end
-                        end
-                    else
-                        if previousFrame then
-                            frame:ClearAllPoints()
-                            if direction == "DOWN" then
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
-                                    spacingY = HealerHelper:GetOptionValue("GAPY")
-                                elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
-                                    spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
-                                end
-
-                                frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
-                            else
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
-                                    spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
-                                elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
-                                    spacingX = HealerHelper:GetOptionValue("GAPX")
-                                end
-
-                                frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
-                            end
-                        end
-                    end
-                end
-            end
-
-            currentlyUpdating[frame] = nil
         end
 
-        local function AddUpdateFramePosition(frame, i, group)
-            if currentlyUpdating[frame] then return end
-            currentlyUpdating[frame] = true
-            UpdateFramePosition(frame, i, group)
-        end
-
-        function HealerHelper:UpdateHealBarsLayout()
-            if test then return end
-            test = true
-            if IsInRaid() then
-                local max = MAX_RAID_MEMBERS or 40
-                for i = 1, max do
-                    local frame = _G["CompactRaidFrame" .. i]
-                    if frame then
-                        AddUpdateFramePosition(frame, i)
-                    else
-                        local group = math.ceil(i / 5)
-                        local member = i % 5
-                        if member == 0 then
-                            member = 5
-                        end
-
-                        local frame2 = _G["CompactRaidGroup" .. group .. "Member" .. member]
-                        if frame2 then
-                            AddUpdateFramePosition(frame2, member, group)
-                        end
-                    end
-                end
-            else
-                local max = MEMBERS_PER_RAID_GROUP or 5
-                for i = 1, max do
-                    local frame = _G["CompactPartyFrameMember" .. i]
-                    if frame == nil then
-                        frame = _G["CompactRaidFrame" .. i]
-                    end
-
-                    if frame then
-                        AddUpdateFramePosition(frame, i)
-                    else
-                        break
-                    end
-                end
-            end
-
-            HealerHelper:UpdateStates()
-            test = false
-        end
-
-        function HealerHelper:CheckForNewFrames()
-            local c = HealerHelper:UpdateAllowedUnitFrames()
-            if c > 0 then
-                for frame, name in pairs(unitFrames) do
-                    if frame ~= nil and healBars[frame] == nil then
-                        healBars[frame] = true
-                        HealerHelper:AddHealbar(frame)
-                        HealerHelper:AddIcons(frame)
-                        HealerHelper:AddTexts(frame)
-                        HealerHelper:UpdateHealBarsLayout()
-                    end
-                end
-            end
-
-            if HealerHelper.DEBUG then
-                HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After 1 CheckForNewFrames")
-            end
-
-            C_Timer.After(
-                1,
-                function()
-                    HealerHelper:CheckForNewFrames()
-                end
-            )
-        end
-
-        HealerHelper:CheckForNewFrames()
         C_Timer.After(
-            0.21,
+            0.0,
             function()
-                HealerHelper:UpdateHealBarsLayout()
+                searchForNew = false
+                if oldc then
+                    HealerHelper:CheckForNewFrames(oldc - i)
+                else
+                    HealerHelper:CheckForNewFrames(c - i)
+                end
             end
         )
+    else
+        C_Timer.After(
+            1,
+            function()
+                searchForNew = false
+                HealerHelper:CheckForNewFrames()
+            end
+        )
+    end
+end
 
-        HealerHelper:MSG(string.format("LOADED v%s", "0.6.2"))
+local healerHelper = CreateFrame("Frame")
+HealerHelper:RegisterEvent(healerHelper, "ADDON_LOADED")
+HealerHelper:RegisterEvent(healerHelper, "GROUP_ROSTER_UPDATE")
+HealerHelper:RegisterEvent(healerHelper, "UNIT_NAME_UPDATE")
+HealerHelper:RegisterEvent(healerHelper, "UNIT_CONNECTION")
+HealerHelper:RegisterEvent(healerHelper, "UNIT_LEVEL")
+HealerHelper:RegisterEvent(healerHelper, "RAID_TARGET_UPDATE")
+healerHelper:SetScript(
+    "OnEvent",
+    function(sel, event, ...)
+        if event == "RAID_TARGET_UPDATE" then
+            for frame, name in pairs(unitFrames) do
+                local targetIcon = frame["HH_TargetingIcon"]
+                if targetIcon then
+                    targetIcon.func(frame, targetIcon)
+                end
+            end
+        elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_NAME_UPDATE" or event == "UNIT_CONNECTION" or event == "UNIT_LEVEL" then
+            if event == "GROUP_ROSTER_UPDATE" then
+                local currentGroupSize = GetNumGroupMembers()
+                if currentGroupSize ~= previousGroupSize then
+                    previousGroupSize = currentGroupSize
+                    HealerHelper:CheckForNewFrames()
+                end
+            end
+
+            for frame, name in pairs(unitFrames) do
+                local stats = frame["HH_Stats"]
+                local level = frame["HH_Level"]
+                local leader = frame["HH_Leader"]
+                local flag = frame["HH_Flag"]
+                if stats then
+                    stats.func(frame, stats)
+                end
+
+                if level then
+                    level.func(frame, level)
+                end
+
+                if leader then
+                    leader.func(frame, leader)
+                end
+
+                if flag then
+                    flag.func(frame, flag)
+                end
+            end
+        elseif event == "ADDON_LOADED" then
+            if select(1, ...) ~= AddonName then return end
+            HEAHELPC = HEAHELPC or {}
+            HEAHELPC["LAYOUT"] = HEAHELPC["LAYOUT"] or "BOTTOM"
+            HEAHELPC["GAPX"] = HEAHELPC["GAPX"] or 6
+            HEAHELPC["GAPY"] = HEAHELPC["GAPY"] or 6
+            HEAHELPC["OFFSET"] = HEAHELPC["OFFSET"] or 2
+            HEAHELPC["RLAYOUT"] = HEAHELPC["RLAYOUT"] or "BOTTOM"
+            HEAHELPC["RGAPX"] = HEAHELPC["RGAPX"] or 4
+            HEAHELPC["RGAPY"] = HEAHELPC["RGAPY"] or 4
+            HEAHELPC["ROFFSET"] = HEAHELPC["ROFFSET"] or 0
+            HEAHELPC["ROWS"] = HEAHELPC["ROWS"] or 2
+            HEAHELPC["ACTIONBUTTONPERROW"] = HEAHELPC["ACTIONBUTTONPERROW"] or 5
+            HEAHELPC["RROWS"] = HEAHELPC["RROWS"] or 2
+            HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
+            HealerHelper:SetAddonOutput("HealerHelper", "134149")
+            HealerHelper:InitSettings()
+            HealerHelper:CheckForNewFrames()
+            local test = false
+            local currentlyUpdating = {}
+            local function UpdateFramePosition(frame, i, group)
+                if InCombatLockdown() and frame:IsProtected() then
+                    C_Timer.After(
+                        0.1,
+                        function()
+                            UpdateFramePosition(frame, i, group)
+                        end
+                    )
+
+                    return
+                end
+
+                if frame ~= nil and HealerHelper:IsAllowed(frame) then
+                    local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
+                    if bar then
+                        if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
+                            if bar then
+                                bar:ClearAllPoints()
+                                bar:SetPoint("TOP", frame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
+                            end
+                        elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                            if bar then
+                                bar:ClearAllPoints()
+                                bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
+                            end
+                        else
+                            HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+                        end
+
+                        local direction = FindDirection()
+                        local spacingY = 0
+                        local spacingX = 0
+                        local y = i % 5
+                        if y == 0 then
+                            y = 5
+                        end
+
+                        local previousFrame = nil
+                        if string.match(frame:GetName(), "CompactPartyFrameMember") then
+                            previousFrame = _G["CompactPartyFrameMember" .. (i - 1)]
+                        elseif string.match(frame:GetName(), "CompactRaidFrame") then
+                            previousFrame = _G["CompactRaidFrame" .. (i - 1)]
+                        elseif string.match(frame:GetName(), "CompactRaidGroup") then
+                            previousFrame = _G["CompactRaidGroup" .. group .. "Member" .. (i - 1)]
+                        end
+
+                        if y == 1 then
+                            previousFrame = _G["CompactRaidFrame" .. (i - 5)]
+                            if previousFrame == nil and group ~= nil then
+                                previousFrame = _G["CompactRaidGroup" .. (group - 1) .. "Member1"]
+                            end
+
+                            if previousFrame then
+                                frame:ClearAllPoints()
+                                if direction == "DOWN" then
+                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                                        frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                                    else
+                                        frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                                    end
+                                else
+                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                                        frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
+                                    else
+                                        frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
+                                    end
+                                end
+                            end
+                        else
+                            if previousFrame then
+                                frame:ClearAllPoints()
+                                if direction == "DOWN" then
+                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
+                                        spacingY = HealerHelper:GetOptionValue("GAPY")
+                                    elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
+                                        spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
+                                    end
+
+                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
+                                else
+                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
+                                        spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
+                                    elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
+                                        spacingX = HealerHelper:GetOptionValue("GAPX")
+                                    end
+
+                                    frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
+                                end
+                            end
+                        end
+                    end
+                end
+
+                currentlyUpdating[frame] = nil
+            end
+
+            local function AddUpdateFramePosition(frame, i, group)
+                if currentlyUpdating[frame] then return end
+                currentlyUpdating[frame] = true
+                UpdateFramePosition(frame, i, group)
+            end
+
+            function HealerHelper:UpdateHealBarsLayout()
+                if test then return end
+                test = true
+                if IsInRaid() then
+                    local max = MAX_RAID_MEMBERS or 40
+                    for i = 1, max do
+                        local frame = _G["CompactRaidFrame" .. i]
+                        if frame then
+                            AddUpdateFramePosition(frame, i)
+                        else
+                            local group = math.ceil(i / 5)
+                            local member = i % 5
+                            if member == 0 then
+                                member = 5
+                            end
+
+                            local frame2 = _G["CompactRaidGroup" .. group .. "Member" .. member]
+                            if frame2 then
+                                AddUpdateFramePosition(frame2, member, group)
+                            end
+                        end
+                    end
+                else
+                    local max = MEMBERS_PER_RAID_GROUP or 5
+                    for i = 1, max do
+                        local frame = _G["CompactPartyFrameMember" .. i]
+                        if frame == nil then
+                            frame = _G["CompactRaidFrame" .. i]
+                        end
+
+                        if frame then
+                            AddUpdateFramePosition(frame, i)
+                        else
+                            break
+                        end
+                    end
+                end
+
+                HealerHelper:UpdateStates()
+                test = false
+            end
+
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.0"))
+        end
     end
 )
 
@@ -370,13 +431,20 @@ function HealerHelper:SetSpellForBtn(b, i)
     if b == nil then return end
     HealerHelper:TryRunSecure(
         function(btn, id)
+            btn:SetAttribute("type", "spell")
             btn:SetAttribute("type1", "spell")
+            btn:SetAttribute("spell", id)
             btn:SetAttribute("spell1", id)
-            btn.spellID = id
-            btn.action = nil
-            local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
-            if btn.icon then
-                btn.icon:SetTexture(iconTexture)
+            btn:SetAttribute("action", nil)
+            btn:SetAttribute("action1", nil)
+            btn:SetAttribute("action2", nil)
+            if true then
+                btn.action = nil
+                btn.spellID = id
+                local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
+                if btn.icon then
+                    btn.icon:SetTexture(iconTexture)
+                end
             end
         end, b, "SetSpellForBtn", b, i
     )
@@ -397,10 +465,18 @@ function HealerHelper:ClearSpellForBtn(b)
     if b == nil then return end
     HealerHelper:TryRunSecure(
         function(btn)
+            btn:SetAttribute("type", nil)
             btn:SetAttribute("type1", nil)
+            btn:SetAttribute("spell", nil)
             btn:SetAttribute("spell1", nil)
-            btn.spellID = nil
-            btn.action = nil
+            btn:SetAttribute("action", nil)
+            btn:SetAttribute("action1", nil)
+            btn:SetAttribute("action2", nil)
+            if true then
+                btn.action = nil
+                btn.spellID = nil
+            end
+
             if btn.icon then
                 btn.icon:SetTexture(nil)
             end
@@ -464,23 +540,17 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
     return dispellableCount, debuffColor
 end
 
-function HealerHelper:RegisterEvent(frame, event, unit)
-    if C_EventUtils.IsEventValid(event) then
-        if unit then
-            frame:RegisterUnitEvent(event, "player")
-        else
-            frame:RegisterEvent(event)
-        end
-    end
-end
-
 function HealerHelper:UpdateStates()
     for i, btns in pairs(actionbuttons) do
         for x, btn in pairs(btns) do
             if not InCombatLockdown() then
                 if i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2) then
-                    btn:SetAttribute("HEAHEL_ignore", false)
-                    btn:SetParent(btn:GetAttribute("HEAHEL_bar"))
+                    if btn:GetParent() ~= btn:GetAttribute("HEAHEL_bar") then
+                        btn:SetAttribute("HEAHEL_ignore", false)
+                        btn:Show()
+                        btn:SetParent(btn:GetAttribute("HEAHEL_bar"))
+                    end
+
                     if btn:GetAttribute("ACTIONBUTTONPERROW") ~= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) then
                         btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
                         btn:SetAttribute("HEAHEL_changed", true)
@@ -491,55 +561,143 @@ function HealerHelper:UpdateStates()
                         btn:SetAttribute("HEAHEL_changed", true)
                     end
                 else
-                    btn:SetAttribute("HEAHEL_ignore", true)
-                    btn:SetParent(HEAHEL_HIDDEN)
+                    if btn:GetParent() ~= HEAHEL_HIDDEN then
+                        btn:SetAttribute("HEAHEL_ignore", true)
+                        btn:Hide()
+                        btn:SetParent(HEAHEL_HIDDEN)
+                    end
                 end
             end
         end
     end
 end
 
+local registered = {}
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
-    customButton.action = nil
-    customButton.spellID = nil
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_INTERRUPTED", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SUCCEEDED", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_FAILED", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_START", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_STOP", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_START", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_STOP", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_TARGET", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_CLEAR", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_START", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_STOP", "player")
-    HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SENT")
-    HealerHelper:RegisterEvent(customButton, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
-    HealerHelper:RegisterEvent(customButton, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
-    HealerHelper:RegisterEvent(customButton, "SPELL_UPDATE_ICON")
+    registered[customButton] = false
     function customButton:UpdateCount()
         local text = self.Count
-        if self.spellID == nil then
+        if self:GetAttribute("spell") == nil then
             text:SetText("")
 
             return
         end
 
-        local info = C_Spell.GetSpellCharges(self.spellID)
+        local info = C_Spell.GetSpellCharges(self:GetAttribute("spell"))
         if info and info.currentCharges ~= nil and info.maxCharges ~= nil then
             if info.maxCharges > 1 then
                 text:SetText(info.currentCharges)
             else
                 text:SetText("")
             end
-        elseif C_Spell.GetSpellCastCount(self.spellID) > 0 then
-            text:SetText(C_Spell.GetSpellCastCount(self.spellID))
+        elseif C_Spell.GetSpellCastCount(self:GetAttribute("spell")) > 0 then
+            text:SetText(C_Spell.GetSpellCastCount(self:GetAttribute("spell")))
         else
             text:SetText("")
         end
+    end
+
+    function customButton:RegisterEvents()
+        registered[customButton] = true
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_INTERRUPTED", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SUCCEEDED", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_FAILED", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_START", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_STOP", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_START", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_STOP", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_TARGET", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_CLEAR", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_START", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_STOP", "player")
+        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SENT")
+        HealerHelper:RegisterEvent(customButton, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
+        HealerHelper:RegisterEvent(customButton, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
+        HealerHelper:RegisterEvent(customButton, "SPELL_UPDATE_ICON")
+        HealerHelper:RegisterEvent(customButton, "SPELL_UPDATE_CHARGES")
+        HealerHelper:RegisterEvent(customButton, "ACTIONBAR_UPDATE_STATE")
+        HealerHelper:RegisterEvent(customButton, "ACTIONBAR_UPDATE_COOLDOWN")
+    end
+
+    if registered[customButton] == false then
+        customButton:RegisterEvents()
+    end
+
+    hooksecurefunc(
+        customButton,
+        "SetParent",
+        function(sel, pa)
+            if pa == bar then
+                if registered[customButton] == false then
+                    customButton:RegisterEvents()
+                end
+            else
+                if registered[customButton] == true then
+                    customButton:UnregisterAllEvents()
+                end
+            end
+        end
+    )
+
+    function customButton:PlaySpellCastAnim(actionButtonCastType)
+        self.cooldown:SetSwipeColor(0, 0, 0, 0)
+        self.hideCooldownFrame = true
+        self:ClearInterruptDisplay()
+        self:ClearReticle()
+        self.SpellCastAnimFrame:Setup(actionButtonCastType)
+        self.actionButtonCastType = actionButtonCastType
+    end
+
+    function customButton:ClearReticle()
+        if self.TargetReticleAnimFrame:IsShown() then
+            self.TargetReticleAnimFrame:Hide()
+        end
+    end
+
+    function customButton:ClearInterruptDisplay()
+        if self.InterruptDisplay:IsShown() then
+            self.InterruptDisplay:Hide()
+        end
+    end
+
+    function customButton:PlayTargettingReticleAnim()
+        if self.InterruptDisplay:IsShown() then
+            self.InterruptDisplay:Hide()
+        end
+
+        self.TargetReticleAnimFrame:Setup()
+    end
+
+    function customButton:StopTargettingReticleAnim()
+        if self.TargetReticleAnimFrame:IsShown() then
+            self.TargetReticleAnimFrame:Hide()
+        end
+    end
+
+    function customButton:StopSpellCastAnim(forceStop, actionButtonCastType)
+        self:StopTargettingReticleAnim()
+        if self.actionButtonCastType == actionButtonCastType then
+            if forceStop then
+                self.SpellCastAnimFrame:Hide()
+            elseif self.SpellCastAnimFrame.Fill.CastingAnim:IsPlaying() then
+                self.SpellCastAnimFrame:FinishAnimAndPlayBurst()
+            end
+
+            self.actionButtonCastType = nil
+        end
+    end
+
+    function customButton:PlaySpellInterruptedAnim()
+        self:StopSpellCastAnim(true, self.actionButtonCastType)
+        --Hide if it's already showing to clear the anim. 
+        if self.InterruptDisplay:IsShown() then
+            self.InterruptDisplay:Hide()
+        end
+
+        self.InterruptDisplay:Show()
     end
 
     customButton:SetScript("OnLoad", function(sel) end)
@@ -547,34 +705,23 @@ function HealerHelper:AddActionButton(frame, bar, i)
     customButton:SetScript("OnHide", function(sel) end)
     customButton:SetScript("OnEnter", function(sel) end)
     customButton:SetScript("OnLeave", function(sel) end)
-    function customButton:OnHealerHelperUpdate()
-        if customButton.spellID then
-            local _, _, iconTexture = HealerHelper:GetSpellInfo(customButton.spellID)
-            if customButton.icon then
-                customButton.icon:SetTexture(iconTexture)
-            end
-
-            ActionButton_UpdateCooldown(customButton)
-        end
-
-        customButton:UpdateCount()
-        C_Timer.After(0.2, customButton.OnHealerHelperUpdate)
-    end
-
-    customButton:OnHealerHelperUpdate()
     customButton:SetScript(
         "OnEvent",
         function(sel, event, ...)
             local spellID = select(3, ...)
-            if spellID == customButton.spellID or spellID == nil then
-                if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+            if spellID == customButton:GetAttribute("spell") or spellID == nil then
+                if event == "ACTIONBAR_UPDATE_COOLDOWN" then
+                    if customButton:GetAttribute("spell") then
+                        ActionButton_UpdateCooldown(customButton)
+                    end
+                elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
                     spellID = select(1, ...)
-                    if spellID == customButton.spellID or (spellID == 462603 and customButton.spellID == 73920) then
+                    if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_ShowOverlayGlow then
                         ActionButton_ShowOverlayGlow(sel)
                     end
                 elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
                     spellID = select(1, ...)
-                    if spellID == customButton.spellID or (spellID == 462603 and customButton.spellID == 73920) then
+                    if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_HideOverlayGlow then
                         ActionButton_HideOverlayGlow(sel)
                     end
                 elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
@@ -607,6 +754,15 @@ function HealerHelper:AddActionButton(frame, bar, i)
                     sel:PlayTargettingReticleAnim()
                 elseif event == "UNIT_SPELLCAST_RETICLE_CLEAR" then
                     sel:StopTargettingReticleAnim()
+                elseif event == "SPELL_UPDATE_ICON" then
+                    local _, _, iconTexture = HealerHelper:GetSpellInfo(customButton:GetAttribute("spell"))
+                    if customButton.icon then
+                        customButton.icon:SetTexture(iconTexture)
+                    end
+                elseif event == "SPELL_UPDATE_CHARGES" then
+                    customButton:UpdateCount()
+                elseif event == "ACTIONBAR_UPDATE_STATE" then
+                    customButton:UpdateCount()
                 end
             end
         end
@@ -618,91 +774,48 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 btn:SetAttribute("type", "spell")
                 btn:SetAttribute("action", nil)
                 btn:SetAttribute("action1", nil)
+                btn:SetAttribute("action2", nil)
                 btn:SetAttribute("ignoreModifiers", "true")
             end, customButton, "AddActionButton", customButton, frame
         )
     end
 
-    HealerHelper:TryRunSecure(
-        function(btn, parent)
-            btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
-            btn:SetAttribute("ROWS", HealerHelper:GetOptionValue("ROWS", 2))
-            btn:SetAttribute("HEAHEL_bar", bar)
-            btn:SetFrameRef("unitFrame", parent)
-            btn:SetFrameRef("bar", bar)
-            btn:SetAttribute("i", i)
-            btn:SetFrameRef("HEAHEL_HIDDEN", parent)
-            btn:SetAttribute("_onattributechanged", [[                   
-                if self:GetAttribute("HEAHEL_ignore") then
-                    return
-                end
-                
-                if name == "state-unit" then
-                    local unitFrame = self:GetFrameRef("unitFrame")
-                    if unitFrame then
-                        local unit = unitFrame:GetAttribute("unit")
-                        self:SetAttribute("unit", unit)
-                    end
-                elseif name == "statehidden" then  
-                    local unitFrame = self:GetFrameRef("unitFrame")                
-                    if unitFrame and unitFrame:IsShown() then
-                        local i = self:GetAttribute("i")
-                        local ACTIONBUTTONPERROW = self:GetAttribute("ACTIONBUTTONPERROW")
-                        local ROWS = self:GetAttribute("ROWS")
-                        if i > ACTIONBUTTONPERROW * ROWS then
-                            return 
-                        end
-                        
-                        local p1, p2, p3, p4, p5 = unitFrame:GetPoint()
-                        local sw = unitFrame:GetWidth()
-                        local sh = unitFrame:GetHeight()
-                    
-                        if self:GetAttribute("HEAHEL_changed") or sw ~= unitFrame:GetAttribute(i .. "sw") or sh ~= unitFrame:GetAttribute(i .. "sh") or p1 ~= unitFrame:GetAttribute(i .. "p1") or p2 ~= unitFrame:GetAttribute(i .. "p2") or p3 ~= unitFrame:GetAttribute(i .. "p3") or p4 ~= unitFrame:GetAttribute(i .. "p4") or p5 ~= unitFrame:GetAttribute(i .. "p5") then
-                            self:SetAttribute("HEAHEL_changed", false)
-                            unitFrame:SetAttribute(i .. "sw", sw)
-                            unitFrame:SetAttribute(i .. "sh", sh)
-
-                            unitFrame:SetAttribute(i .. "p1", p1)
-                            unitFrame:SetAttribute(i .. "p2", p2)
-                            unitFrame:SetAttribute(i .. "p3", p3)
-                            unitFrame:SetAttribute(i .. "p4", p4)
-                            unitFrame:SetAttribute(i .. "p5", p5)
-
-                            local bar = self:GetFrameRef("bar")                          
-
-                            local sw, sh = unitFrame:GetWidth(), unitFrame:GetHeight()
-                            bar:SetWidth(sw)
-                            bar:SetHeight(sw / ACTIONBUTTONPERROW * ROWS)
-
-                            local scale = sw / (self:GetWidth() * ACTIONBUTTONPERROW)
-                            self:SetScale(scale)
-
-                            local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
-                            local col = (i - 1) % ACTIONBUTTONPERROW
-                            local xOffset = col * self:GetWidth()
-                            local yOffset = row * -self:GetHeight()
-
-                            self:ClearAllPoints()
-                            self:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset)
+    if true then
+        HealerHelper:TryRunSecure(
+            function(btn, parent)
+                btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
+                btn:SetAttribute("ROWS", HealerHelper:GetOptionValue("ROWS", 2))
+                btn:SetAttribute("HEAHEL_bar", bar)
+                btn:SetFrameRef("unitFrame", parent)
+                btn:SetFrameRef("bar", bar)
+                btn:SetAttribute("i", i)
+                btn:SetFrameRef("HEAHEL_HIDDEN", parent)
+                btn:SetAttribute("_onattributechanged", [[
+                    if name == "state-unit" then                       
+                        local unitFrame = self:GetFrameRef("unitFrame")
+                        if unitFrame then
+                            local unit = unitFrame:GetAttribute("unit")
+                            self:SetAttribute("unit", unit)
                         end
                     end
-                end
-            ]])
-            RegisterStateDriver(btn, "unit", "[combat] none; [nocombat] party1")
-            RegisterStateDriver(btn, "visibility", "show;hide")
-        end, customButton, "SecureActionButtons", customButton, frame
-    )
-
-    frame:HookScript(
-        "OnAttributeChanged",
-        function(sel, nam, valu)
-            if sel == nil then return end
-            if InCombatLockdown() and sel:IsProtected() then return false end
-            if nam == "unit" then
-                customButton:SetAttribute("unit", valu)
-            end
-        end
-    )
+                ]])
+                RegisterStateDriver(btn, "unit", "[combat] none; [nocombat] party1")
+                local ACTIONBUTTONPERROW = HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5)
+                local ROWS = HealerHelper:GetOptionValue("ROWS", 5)
+                local sw = parent:GetWidth()
+                bar:SetWidth(sw)
+                bar:SetHeight(sw / ACTIONBUTTONPERROW * ROWS)
+                local scale = sw / (btn:GetWidth() * ACTIONBUTTONPERROW)
+                btn:SetScale(scale)
+                local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
+                local col = (i - 1) % ACTIONBUTTONPERROW
+                local xOffset = col * btn:GetWidth()
+                local yOffset = row * -btn:GetHeight()
+                btn:ClearAllPoints()
+                btn:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset)
+            end, customButton, "SecureActionButtons", customButton, frame
+        )
+    end
 
     if HealerHelper:GetOptionValue("spell" .. i) ~= nil then
         HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i), i)
@@ -710,7 +823,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
         HealerHelper:ClearSpell(customButton, i)
     end
 
-    customButton:UpdateCount()
     customButton:RegisterForDrag("LeftButton")
     customButton:RegisterForClicks("AnyUp", "AnyDown")
     customButton:SetScript(
@@ -817,6 +929,13 @@ function HealerHelper:AddActionButton(frame, bar, i)
             end, customButton, "Charges Reposition", customButton
         )
     end
+
+    C_Timer.After(
+        0,
+        function()
+            customButton:UpdateCount()
+        end
+    )
 end
 
 function HealerHelper:AddHealbar(unitFrame)
@@ -843,26 +962,15 @@ function HealerHelper:AddHealbar(unitFrame)
             bar.t:SetAllPoints(bar)
         end
 
-        for i = 1, 100 do
+        for i = 1, 24 do
             HealerHelper:AddActionButton(unitFrame, bar, i)
         end
     end
 end
 
-function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func, updateDelay, updateDelayRaid)
-    if updateDelay == nil then
-        HealerHelper:MSG("[AddIcon] Missing updateDelay")
-
-        return
-    end
-
-    if updateDelayRaid == nil then
-        HealerHelper:MSG("[AddIcon] Missing updateDelayRaid")
-
-        return
-    end
-
-    local icon = frame:CreateTexture()
+function HealerHelper:AddIcon(frame, name, atlas, texture, p1, p2, p3, p4, p5, func)
+    frame[name] = frame:CreateTexture(frame:GetName() .. "." .. name)
+    local icon = frame[name]
     if atlas then
         icon:SetAtlas(atlas)
     elseif texture then
@@ -871,26 +979,8 @@ function HealerHelper:AddIcon(frame, atlas, texture, p1, p2, p3, p4, p5, func, u
 
     icon:SetSize(16, 16)
     icon:SetPoint(p1, p2, p3, p4, p5)
-    local function OnUpdateIcon(parent, ico)
-        func(parent, ico)
-        local delay = updateDelay
-        if IsInRaid() then
-            delay = updateDelayRaid
-        end
-
-        if HealerHelper.DEBUG then
-            HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After " .. delay .. " OnUpdateIcon")
-        end
-
-        C_Timer.After(
-            delay,
-            function()
-                OnUpdateIcon(parent, ico)
-            end
-        )
-    end
-
-    OnUpdateIcon(frame, icon)
+    icon.func = func
+    func(frame, icon)
 end
 
 function HealerHelper:AddIcons(frame)
@@ -899,6 +989,7 @@ function HealerHelper:AddIcons(frame)
     if name == nil then return end
     HealerHelper:AddIcon(
         frame,
+        "HH_Leader",
         "UI-HUD-UnitFrame-Player-Group-LeaderIcon",
         nil,
         "BOTTOM",
@@ -916,9 +1007,9 @@ function HealerHelper:AddIcons(frame)
         end, 0.5, 1.5
     )
 
-    local oldRaidTarget = nil
     HealerHelper:AddIcon(
         frame,
+        "HH_TargetingIcon",
         nil,
         nil,
         "LEFT",
@@ -928,19 +1019,17 @@ function HealerHelper:AddIcons(frame)
         0,
         function(parent, icon)
             if parent.unit == nil then return end
-            if oldRaidTarget ~= GetRaidTargetIndex(parent.unit) then
-                oldRaidTarget = GetRaidTargetIndex(parent.unit)
-                if GetRaidTargetIndex(parent.unit) then
-                    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
-                else
-                    icon:SetTexture(nil)
-                end
+            if GetRaidTargetIndex(parent.unit) then
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
+            else
+                icon:SetTexture(nil)
             end
         end, 0.2, 0.4
     )
 
     HealerHelper:AddIcon(
         frame,
+        "HH_Flag",
         nil,
         nil,
         "TOPRIGHT",
@@ -991,43 +1080,14 @@ function HealerHelper:AddIcons(frame)
     HealerHelper:AddDispellBorder(frame)
 end
 
-function HealerHelper:AddTextStr(frame, func, ts, p1, p2, p3, p4, p5, updateDelay, updateDelayRaid)
-    if updateDelay == nil then
-        HealerHelper:MSG("[AddTextStr] Missing updateDelay")
-
-        return
-    end
-
-    if updateDelayRaid == nil then
-        HealerHelper:MSG("[AddTextStr] Missing updateDelayRaid")
-
-        return
-    end
-
-    local t = frame:CreateFontString("_UnitLevel", "OVERLAY", "GameTooltipText")
+function HealerHelper:AddTextStr(frame, name, func, ts, p1, p2, p3, p4, p5)
+    frame[name] = frame:CreateFontString(frame:GetName() .. "." .. name, "OVERLAY", "GameTooltipText")
+    local t = frame[name]
     local f1, _, f3 = t:GetFont()
     t:SetFont(f1, ts, f3)
     t:SetPoint(p1, p2, p3, p4, p5)
-    local function OnTextUpdate(parent, text)
-        func(parent, text)
-        local delay = updateDelay
-        if IsInRaid() then
-            delay = updateDelayRaid
-        end
-
-        if HealerHelper.DEBUG then
-            HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After " .. delay .. " OnTextUpdate")
-        end
-
-        C_Timer.After(
-            delay,
-            function()
-                OnTextUpdate(parent, text)
-            end
-        )
-    end
-
-    OnTextUpdate(frame, t)
+    t.func = func
+    func(frame, t)
 end
 
 function HealerHelper:AddTexts(frame)
@@ -1038,6 +1098,7 @@ function HealerHelper:AddTexts(frame)
     if healthBar then
         HealerHelper:AddTextStr(
             frame,
+            "HH_Level",
             function(parent, text)
                 if InCombatLockdown() then
                     text:SetText("")
@@ -1080,6 +1141,7 @@ function HealerHelper:AddTexts(frame)
 
         HealerHelper:AddTextStr(
             frame,
+            "HH_Stats",
             function(parent, text)
                 if IsInRaid() then
                     text:SetText("")

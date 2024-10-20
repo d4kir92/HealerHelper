@@ -119,10 +119,6 @@ function HealerHelper:AddDispellBorder(frame)
             end
         end
 
-        if HealerHelper.DEBUG then
-            HealerHelper:MSG("[HealerHelper.DEBUG] C_Timer.After 0.2 OnDebuffDispellable")
-        end
-
         C_Timer.After(
             0.2,
             function()
