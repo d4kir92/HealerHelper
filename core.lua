@@ -461,7 +461,7 @@ healerHelper:SetScript(
                 test = false
             end
 
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.3"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.4"))
         end
     end
 )
@@ -671,32 +671,37 @@ function HealerHelper:AddActionButton(frame, bar, i)
         self.hideCooldownFrame = true
         self:ClearInterruptDisplay()
         self:ClearReticle()
-        self.SpellCastAnimFrame:Setup(actionButtonCastType)
+        if self.SpellCastAnimFrame then
+            self.SpellCastAnimFrame:Setup(actionButtonCastType)
+        end
+
         self.actionButtonCastType = actionButtonCastType
     end
 
     function customButton:ClearReticle()
-        if self.TargetReticleAnimFrame:IsShown() then
+        if self.TargetReticleAnimFrame and self.TargetReticleAnimFrame:IsShown() then
             self.TargetReticleAnimFrame:Hide()
         end
     end
 
     function customButton:ClearInterruptDisplay()
-        if self.InterruptDisplay:IsShown() then
+        if self.InterruptDisplay and self.InterruptDisplay:IsShown() then
             self.InterruptDisplay:Hide()
         end
     end
 
     function customButton:PlayTargettingReticleAnim()
-        if self.InterruptDisplay:IsShown() then
+        if self.InterruptDisplay and self.InterruptDisplay:IsShown() then
             self.InterruptDisplay:Hide()
         end
 
-        self.TargetReticleAnimFrame:Setup()
+        if self.TargetReticleAnimFrame then
+            self.TargetReticleAnimFrame:Setup()
+        end
     end
 
     function customButton:StopTargettingReticleAnim()
-        if self.TargetReticleAnimFrame:IsShown() then
+        if self.TargetReticleAnimFrame and self.TargetReticleAnimFrame:IsShown() then
             self.TargetReticleAnimFrame:Hide()
         end
     end
@@ -704,10 +709,12 @@ function HealerHelper:AddActionButton(frame, bar, i)
     function customButton:StopSpellCastAnim(forceStop, actionButtonCastType)
         self:StopTargettingReticleAnim()
         if self.actionButtonCastType == actionButtonCastType then
-            if forceStop then
-                self.SpellCastAnimFrame:Hide()
-            elseif self.SpellCastAnimFrame.Fill.CastingAnim:IsPlaying() then
-                self.SpellCastAnimFrame:FinishAnimAndPlayBurst()
+            if self.SpellCastAnimFrame then
+                if forceStop then
+                    self.SpellCastAnimFrame:Hide()
+                elseif self.SpellCastAnimFrame.Fill.CastingAnim:IsPlaying() then
+                    self.SpellCastAnimFrame:FinishAnimAndPlayBurst()
+                end
             end
 
             self.actionButtonCastType = nil
@@ -717,11 +724,13 @@ function HealerHelper:AddActionButton(frame, bar, i)
     function customButton:PlaySpellInterruptedAnim()
         self:StopSpellCastAnim(true, self.actionButtonCastType)
         --Hide if it's already showing to clear the anim. 
-        if self.InterruptDisplay:IsShown() then
+        if self.InterruptDisplay and self.InterruptDisplay:IsShown() then
             self.InterruptDisplay:Hide()
         end
 
-        self.InterruptDisplay:Show()
+        if self.InterruptDisplay then
+            self.InterruptDisplay:Show()
+        end
     end
 
     customButton:SetScript("OnLoad", function(sel) end)
@@ -906,7 +915,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 
     local textureScale = 0.048
-    if false then
+    if HealerHelper:GetWoWBuild() ~= "RETAIL" then
         if customButton.NormalTexture then
             customButton.NormalTexture:SetScale(textureScale)
         end
