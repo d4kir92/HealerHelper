@@ -211,6 +211,42 @@ function HealerHelper:CheckForNewFrames(oldc)
     end
 end
 
+function HealerHelper:UpdateStateBtn(i, btn)
+    if i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2) then
+        if btn:GetParent() ~= btn:GetAttribute("HEAHEL_bar") then
+            btn:SetAttribute("HEAHEL_ignore", false)
+            btn:Show()
+            btn:SetParent(btn:GetAttribute("HEAHEL_bar"))
+        end
+
+        if btn:GetAttribute("ACTIONBUTTONPERROW") ~= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) then
+            btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
+            btn:SetAttribute("HEAHEL_changed", true)
+        end
+
+        if btn:GetAttribute("ROWS") ~= HealerHelper:GetOptionValue("ROWS", 5) then
+            btn:SetAttribute("ROWS", HealerHelper:GetOptionValue("ROWS", 2))
+            btn:SetAttribute("HEAHEL_changed", true)
+        end
+    else
+        if btn:GetParent() ~= HEAHEL_HIDDEN then
+            btn:SetAttribute("HEAHEL_ignore", true)
+            btn:Hide()
+            btn:SetParent(HEAHEL_HIDDEN)
+        end
+    end
+end
+
+function HealerHelper:UpdateStates()
+    for i, btns in pairs(actionbuttons) do
+        for x, btn in pairs(btns) do
+            if not InCombatLockdown() then
+                HealerHelper:UpdateStateBtn(i, btn)
+            end
+        end
+    end
+end
+
 local healerHelper = CreateFrame("Frame")
 HealerHelper:RegisterEvent(healerHelper, "ADDON_LOADED")
 HealerHelper:RegisterEvent(healerHelper, "GROUP_ROSTER_UPDATE")
@@ -290,82 +326,80 @@ healerHelper:SetScript(
                     return
                 end
 
-                if frame ~= nil and HealerHelper:IsAllowed(frame) then
-                    local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
-                    if bar then
-                        if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
-                            if bar then
-                                bar:ClearAllPoints()
-                                bar:SetPoint("TOP", frame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
-                            end
-                        elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                            if bar then
-                                bar:ClearAllPoints()
-                                bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
-                            end
-                        else
-                            HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+                local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
+                if frame ~= nil and HealerHelper:IsAllowed(frame) and bar then
+                    if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
+                        if bar then
+                            bar:ClearAllPoints()
+                            bar:SetPoint("TOP", frame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
+                        end
+                    elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                        if bar then
+                            bar:ClearAllPoints()
+                            bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
+                        end
+                    else
+                        HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+                    end
+
+                    local direction = FindDirection()
+                    local spacingY = 0
+                    local spacingX = 0
+                    local y = i % 5
+                    if y == 0 then
+                        y = 5
+                    end
+
+                    local previousFrame = nil
+                    if string.match(frame:GetName(), "CompactPartyFrameMember") then
+                        previousFrame = _G["CompactPartyFrameMember" .. (i - 1)]
+                    elseif string.match(frame:GetName(), "CompactRaidFrame") then
+                        previousFrame = _G["CompactRaidFrame" .. (i - 1)]
+                    elseif string.match(frame:GetName(), "CompactRaidGroup") then
+                        previousFrame = _G["CompactRaidGroup" .. group .. "Member" .. (i - 1)]
+                    end
+
+                    if y == 1 then
+                        previousFrame = _G["CompactRaidFrame" .. (i - 5)]
+                        if previousFrame == nil and group ~= nil then
+                            previousFrame = _G["CompactRaidGroup" .. (group - 1) .. "Member1"]
                         end
 
-                        local direction = FindDirection()
-                        local spacingY = 0
-                        local spacingX = 0
-                        local y = i % 5
-                        if y == 0 then
-                            y = 5
-                        end
-
-                        local previousFrame = nil
-                        if string.match(frame:GetName(), "CompactPartyFrameMember") then
-                            previousFrame = _G["CompactPartyFrameMember" .. (i - 1)]
-                        elseif string.match(frame:GetName(), "CompactRaidFrame") then
-                            previousFrame = _G["CompactRaidFrame" .. (i - 1)]
-                        elseif string.match(frame:GetName(), "CompactRaidGroup") then
-                            previousFrame = _G["CompactRaidGroup" .. group .. "Member" .. (i - 1)]
-                        end
-
-                        if y == 1 then
-                            previousFrame = _G["CompactRaidFrame" .. (i - 5)]
-                            if previousFrame == nil and group ~= nil then
-                                previousFrame = _G["CompactRaidGroup" .. (group - 1) .. "Member1"]
-                            end
-
-                            if previousFrame then
-                                frame:ClearAllPoints()
-                                if direction == "DOWN" then
-                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                                        frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                                    else
-                                        frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                                    end
+                        if previousFrame then
+                            frame:ClearAllPoints()
+                            if direction == "DOWN" then
+                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                                    frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
                                 else
-                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                                        frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
-                                    else
-                                        frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
-                                    end
+                                    frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                                end
+                            else
+                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
+                                else
+                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
                                 end
                             end
-                        else
-                            if previousFrame then
-                                frame:ClearAllPoints()
-                                if direction == "DOWN" then
-                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
-                                        spacingY = HealerHelper:GetOptionValue("GAPY")
-                                    elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
-                                        spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
-                                    end
-
-                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
-                                else
-                                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
-                                        spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
-                                    elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
-                                        spacingX = HealerHelper:GetOptionValue("GAPX")
-                                    end
-
-                                    frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
+                        end
+                    else
+                        if previousFrame then
+                            frame:ClearAllPoints()
+                            if direction == "DOWN" then
+                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
+                                    spacingY = HealerHelper:GetOptionValue("GAPY")
+                                elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
+                                    spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
                                 end
+
+                                frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
+                            else
+                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
+                                    spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
+                                elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
+                                    spacingX = HealerHelper:GetOptionValue("GAPX")
+                                end
+
+                                frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
                             end
                         end
                     end
@@ -422,7 +456,7 @@ healerHelper:SetScript(
                 test = false
             end
 
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.0"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.1"))
         end
     end
 )
@@ -540,43 +574,13 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
     return dispellableCount, debuffColor
 end
 
-function HealerHelper:UpdateStates()
-    for i, btns in pairs(actionbuttons) do
-        for x, btn in pairs(btns) do
-            if not InCombatLockdown() then
-                if i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2) then
-                    if btn:GetParent() ~= btn:GetAttribute("HEAHEL_bar") then
-                        btn:SetAttribute("HEAHEL_ignore", false)
-                        btn:Show()
-                        btn:SetParent(btn:GetAttribute("HEAHEL_bar"))
-                    end
-
-                    if btn:GetAttribute("ACTIONBUTTONPERROW") ~= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) then
-                        btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
-                        btn:SetAttribute("HEAHEL_changed", true)
-                    end
-
-                    if btn:GetAttribute("ROWS") ~= HealerHelper:GetOptionValue("ROWS", 5) then
-                        btn:SetAttribute("ROWS", HealerHelper:GetOptionValue("ROWS", 2))
-                        btn:SetAttribute("HEAHEL_changed", true)
-                    end
-                else
-                    if btn:GetParent() ~= HEAHEL_HIDDEN then
-                        btn:SetAttribute("HEAHEL_ignore", true)
-                        btn:Hide()
-                        btn:SetParent(HEAHEL_HIDDEN)
-                    end
-                end
-            end
-        end
-    end
-end
-
 local registered = {}
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
+    customButton:SetAttribute("HEAHEL_bar", bar)
+    HealerHelper:UpdateStateBtn(i, customButton)
     registered[customButton] = false
     function customButton:UpdateCount()
         local text = self.Count
@@ -800,20 +804,44 @@ function HealerHelper:AddActionButton(frame, bar, i)
                     end
                 ]])
                 RegisterStateDriver(btn, "unit", "[combat] none; [nocombat] party1")
-                local ACTIONBUTTONPERROW = HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5)
-                local ROWS = HealerHelper:GetOptionValue("ROWS", 5)
-                local sw = parent:GetWidth()
-                bar:SetWidth(sw)
-                bar:SetHeight(sw / ACTIONBUTTONPERROW * ROWS)
-                local scale = sw / (btn:GetWidth() * ACTIONBUTTONPERROW)
-                btn:SetScale(scale)
-                local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
-                local col = (i - 1) % ACTIONBUTTONPERROW
-                local xOffset = col * btn:GetWidth()
-                local yOffset = row * -btn:GetHeight()
-                btn:ClearAllPoints()
-                btn:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset)
+                frame:HookScript(
+                    "OnAttributeChanged",
+                    function(sel, nam, valu)
+                        if sel == nil then return end
+                        if InCombatLockdown() and sel:IsProtected() then return false end
+                        if nam == "unit" then
+                            customButton:SetAttribute("unit", valu)
+                        end
+                    end
+                )
             end, customButton, "SecureActionButtons", customButton, frame
+        )
+
+        local function UpdateDesign(sel)
+            if InCombatLockdown() and bar:IsProtected() then return end
+            local ACTIONBUTTONPERROW = HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5)
+            local ROWS = HealerHelper:GetOptionValue("ROWS", 5)
+            local sw = sel:GetWidth()
+            bar:SetWidth(sw)
+            bar:SetHeight(sw / ACTIONBUTTONPERROW * ROWS)
+            local scale = sw / (customButton:GetWidth() * ACTIONBUTTONPERROW)
+            local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
+            local col = (i - 1) % ACTIONBUTTONPERROW
+            local xOffset = col * customButton:GetWidth()
+            local yOffset = row * -customButton:GetHeight()
+            if InCombatLockdown() and customButton:IsProtected() then return end
+            customButton:SetScale(scale)
+            customButton:ClearAllPoints()
+            customButton:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset)
+        end
+
+        UpdateDesign(frame)
+        hooksecurefunc(
+            frame,
+            "SetPoint",
+            function(sel)
+                UpdateDesign(sel)
+            end
         )
     end
 
@@ -955,7 +983,20 @@ function HealerHelper:AddHealbar(unitFrame)
     if name ~= nil then
         local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame, "SecureHandlerAttributeTemplate")
         bar:SetSize(10, 10)
-        bar:SetPoint("CENTER", unitFrame, "CENTER", 0, 0)
+        if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
+            if bar then
+                bar:ClearAllPoints()
+                bar:SetPoint("TOP", unitFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
+            end
+        elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+            if bar then
+                bar:ClearAllPoints()
+                bar:SetPoint("LEFT", unitFrame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
+            end
+        else
+            HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+        end
+
         if HealerHelper.DEBUG then
             bar.t = bar:CreateTexture()
             bar.t:SetColorTexture(1, 0, 0)
