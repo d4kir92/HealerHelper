@@ -161,8 +161,6 @@ function HealerHelper:RegisterEvent(frame, event, unit)
         else
             frame:RegisterEvent(event)
         end
-    else
-        HealerHelper:MSG("Missing event", event, unit)
     end
 end
 
@@ -247,6 +245,15 @@ function HealerHelper:UpdateStates()
     end
 end
 
+function HealerHelper:UpdateRaidTargets()
+    for frame, name in pairs(unitFrames) do
+        local targetIcon = frame["HH_TargetingIcon"]
+        if targetIcon then
+            targetIcon.func(frame, targetIcon)
+        end
+    end
+end
+
 local healerHelper = CreateFrame("Frame")
 HealerHelper:RegisterEvent(healerHelper, "ADDON_LOADED")
 HealerHelper:RegisterEvent(healerHelper, "GROUP_ROSTER_UPDATE")
@@ -258,12 +265,7 @@ healerHelper:SetScript(
     "OnEvent",
     function(sel, event, ...)
         if event == "RAID_TARGET_UPDATE" then
-            for frame, name in pairs(unitFrames) do
-                local targetIcon = frame["HH_TargetingIcon"]
-                if targetIcon then
-                    targetIcon.func(frame, targetIcon)
-                end
-            end
+            HealerHelper:UpdateRaidTargets()
         elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_NAME_UPDATE" or event == "UNIT_CONNECTION" or event == "UNIT_LEVEL" then
             if event == "GROUP_ROSTER_UPDATE" then
                 local currentGroupSize = GetNumGroupMembers()
@@ -272,6 +274,7 @@ healerHelper:SetScript(
                     HealerHelper:CheckForNewFrames()
                 end
 
+                HealerHelper:UpdateRaidTargets()
                 HealerHelper:UpdateHealBarsLayout()
             end
 
@@ -458,7 +461,7 @@ healerHelper:SetScript(
                 test = false
             end
 
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.2"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.3"))
         end
     end
 )
@@ -581,10 +584,22 @@ function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
+    if customButton.Count == nil then
+        customButton.Count = customButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        customButton.Count:SetPoint("BOTTOMRIGHT", customButton, "BOTTOMRIGHT", -2, 2)
+        customButton.Count:SetTextColor(1, 1, 1, 1)
+    end
+
+    if customButton.cooldown == nil then
+        customButton.cooldown = CreateFrame("Cooldown", nil, customButton, "CooldownFrameTemplate")
+        customButton.cooldown:SetAllPoints(customButton)
+    end
+
     customButton:SetAttribute("HEAHEL_bar", bar)
     HealerHelper:UpdateStateBtn(i, customButton)
     registered[customButton] = false
     function customButton:UpdateCount()
+        if self.Count == nil then return end
         local text = self.Count
         if self:GetAttribute("spell") == nil then
             text:SetText("")
@@ -649,7 +664,10 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 
     function customButton:PlaySpellCastAnim(actionButtonCastType)
-        self.cooldown:SetSwipeColor(0, 0, 0, 0)
+        if self.cooldown then
+            self.cooldown:SetSwipeColor(0, 0, 0, 0)
+        end
+
         self.hideCooldownFrame = true
         self:ClearInterruptDisplay()
         self:ClearReticle()
@@ -888,76 +906,78 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 
     local textureScale = 0.048
-    if customButton.NormalTexture then
-        customButton.NormalTexture:SetScale(textureScale)
-    end
+    if false then
+        if customButton.NormalTexture then
+            customButton.NormalTexture:SetScale(textureScale)
+        end
 
-    if customButton.HighlightTexture then
-        customButton.HighlightTexture:SetScale(textureScale)
-    end
+        if customButton.HighlightTexture then
+            customButton.HighlightTexture:SetScale(textureScale)
+        end
 
-    if customButton.CheckedTexture then
-        customButton.CheckedTexture:SetScale(textureScale)
-    end
+        if customButton.CheckedTexture then
+            customButton.CheckedTexture:SetScale(textureScale)
+        end
 
-    if customButton.PushedTexture then
-        customButton.PushedTexture:SetScale(textureScale)
-    end
+        if customButton.PushedTexture then
+            customButton.PushedTexture:SetScale(textureScale)
+        end
 
-    if customButton.SpellCastAnimFrame then
-        customButton.SpellCastAnimFrame:SetScale(textureScale - 0.002)
-    end
+        if customButton.SpellCastAnimFrame then
+            customButton.SpellCastAnimFrame:SetScale(textureScale - 0.002)
+        end
 
-    if customButton.InterruptDisplay then
-        customButton.InterruptDisplay:SetScale(textureScale - 0.002)
-    end
+        if customButton.InterruptDisplay then
+            customButton.InterruptDisplay:SetScale(textureScale - 0.002)
+        end
 
-    if customButton.InterruptDisplay then
-        customButton.InterruptDisplay:SetScale(textureScale)
-    end
+        if customButton.InterruptDisplay then
+            customButton.InterruptDisplay:SetScale(textureScale)
+        end
 
-    if customButton.SlotArt then
-        customButton.SlotArt:SetScale(textureScale)
-    end
+        if customButton.SlotArt then
+            customButton.SlotArt:SetScale(textureScale)
+        end
 
-    if customButton.SlotBackground then
-        customButton.SlotBackground:SetScale(textureScale)
-    end
+        if customButton.SlotBackground then
+            customButton.SlotBackground:SetScale(textureScale)
+        end
 
-    if customButton.Name then
-        customButton.Name:SetScale(textureScale)
-    end
+        if customButton.Name then
+            customButton.Name:SetScale(textureScale)
+        end
 
-    if customButton.IconMask then
-        customButton.IconMask:SetScale(textureScale)
-    end
+        if customButton.IconMask then
+            customButton.IconMask:SetScale(textureScale)
+        end
 
-    if customButton.TargetReticleAnimFrame then
-        customButton.TargetReticleAnimFrame:SetScale(textureScale)
-    end
+        if customButton.TargetReticleAnimFrame then
+            customButton.TargetReticleAnimFrame:SetScale(textureScale)
+        end
 
-    local cooldown = _G[customButton:GetName() .. "Cooldown"]
-    if cooldown then
-        cooldown:SetScale(textureScale)
-    end
+        local cooldown = _G[customButton:GetName() .. "Cooldown"]
+        if cooldown then
+            cooldown:SetScale(textureScale)
+        end
 
-    if ActionButton_SetupOverlayGlow then
-        ActionButton_SetupOverlayGlow(customButton)
-    end
+        if ActionButton_SetupOverlayGlow then
+            ActionButton_SetupOverlayGlow(customButton)
+        end
 
-    if customButton.SpellActivationAlert and customButton.SpellActivationAlert.ProcLoopFlipbook then
-        customButton.SpellActivationAlert.ProcLoopFlipbook:SetScale(textureScale)
-        customButton.SpellActivationAlert.ProcStartFlipbook:SetScale(textureScale)
-    end
+        if customButton.SpellActivationAlert and customButton.SpellActivationAlert.ProcLoopFlipbook then
+            customButton.SpellActivationAlert.ProcLoopFlipbook:SetScale(textureScale)
+            customButton.SpellActivationAlert.ProcStartFlipbook:SetScale(textureScale)
+        end
 
-    if customButton.Count then
-        customButton.Count:SetScale(0.06)
-        HealerHelper:TryRunSecure(
-            function(btn)
-                btn.Count:ClearAllPoints()
-                btn.Count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
-            end, customButton, "Charges Reposition", customButton
-        )
+        if customButton.Count then
+            customButton.Count:SetScale(0.06)
+            HealerHelper:TryRunSecure(
+                function(btn)
+                    btn.Count:ClearAllPoints()
+                    btn.Count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+                end, customButton, "Charges Reposition", customButton
+            )
+        end
     end
 
     C_Timer.After(
