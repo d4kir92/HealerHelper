@@ -171,7 +171,7 @@ local searchForNew = false
 function HealerHelper:CheckForNewFrames(oldc)
     if searchForNew then return end
     searchForNew = true
-    if oldc and oldc == 0 then
+    if oldc and oldc <= 0 then
         HealerHelper:UpdateHealBarsLayout()
     end
 
@@ -271,6 +271,8 @@ healerHelper:SetScript(
                     previousGroupSize = currentGroupSize
                     HealerHelper:CheckForNewFrames()
                 end
+
+                HealerHelper:UpdateHealBarsLayout()
             end
 
             for frame, name in pairs(unitFrames) do
@@ -456,7 +458,7 @@ healerHelper:SetScript(
                 test = false
             end
 
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.1"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.2"))
         end
     end
 )
