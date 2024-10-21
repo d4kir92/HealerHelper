@@ -119,8 +119,9 @@ function HealerHelper:AddDispellBorder(frame)
             end
         end
 
+        local delay = IsInRaid() and 0.2 or 0.01
         C_Timer.After(
-            0.2,
+            delay,
             function()
                 OnDebuffDispellable()
             end
@@ -177,6 +178,8 @@ function HealerHelper:FoundDispellable()
     )
 end
 
+local spellseismischesSchmettern = 424888
+local debuffSeismischerNachhall = 424889
 function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
     if spellID == 440313 then
         local _, className = UnitClass("player")
@@ -188,7 +191,7 @@ function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
     end
 
     if debuffType then
-        if HealerHelper:CanDispell(debuffType) then
+        if HealerHelper:CanDispell(debuffType) and (spellID ~= debuffSeismischerNachhall or HealerHelper:IsBossCastingSpell(spellID)) then
             HealerHelper:FoundDispellable()
         end
 
@@ -196,4 +199,23 @@ function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
     end
 
     return {1, 1, 0, 1}
+end
+
+local seismischesSchmettern = true
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+local function OnEvent(self, event)
+    local _, subEvent, _, _, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
+    if spellID == spellseismischesSchmettern then
+        if subEvent == "SPELL_CAST_START" then
+            seismischesSchmettern = true
+        elseif subEvent == "SPELL_CAST_SUCCESS" then
+            seismischesSchmettern = false
+        end
+    end
+end
+
+frame:SetScript("OnEvent", OnEvent)
+function HealerHelper:IsBossCastingSpell(spellID)
+    return seismischesSchmettern
 end

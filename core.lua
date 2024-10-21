@@ -461,7 +461,7 @@ healerHelper:SetScript(
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             HealerHelper:CheckForNewFrames()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.5"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.6"))
         end
     end
 )
@@ -562,7 +562,6 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
     else
         for i = 1, 99 do
             local _, _, _, debuffType, _, _, _, _, _, spellID = UnitAura(unit, i, "HARMFUL")
-            -- AFFIX
             if spellID == 440313 then
                 dispellableCount = dispellableCount + 1
                 hasAffix = true
