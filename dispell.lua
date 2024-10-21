@@ -121,7 +121,7 @@ function HealerHelper:AddDispellBorder(frame)
             end
         end
 
-        local delay = IsInRaid() and 0.2 or 0.01
+        local delay = IsInRaid() and 0.25 or 0.01
         C_Timer.After(
             delay,
             function()
