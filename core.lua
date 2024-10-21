@@ -461,7 +461,7 @@ healerHelper:SetScript(
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             HealerHelper:CheckForNewFrames()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.6"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.7"))
         end
     end
 )
@@ -549,7 +549,7 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
                     dispellableCount = dispellableCount + 1
                     hasAffix = true
                     debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellID)
-                elseif debuffType and HealerHelper:CanDispell(debuffType) then
+                elseif debuffType and HealerHelper:CanDispell(debuffType, spellID) then
                     dispellableCount = dispellableCount + 1
                     if not hasAffix then
                         debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellID)
@@ -566,7 +566,7 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
                 dispellableCount = dispellableCount + 1
                 hasAffix = true
                 debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellID)
-            elseif debuffType and HealerHelper:CanDispell(debuffType) then
+            elseif debuffType and HealerHelper:CanDispell(debuffType, spellID) then
                 dispellableCount = dispellableCount + 1
                 if not hasAffix then
                     debuffColor = HealerHelper:GetDebuffTypeColor(debuffType, spellID)

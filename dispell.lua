@@ -1,4 +1,6 @@
 local _, HealerHelper = ...
+local spellSeismischesSchmettern = 424888
+local debuffSeismischerNachhall = 424889
 local dispells = {}
 if HealerHelper:GetWoWBuild() == "RETAIL" then
     dispells["DEATHKNIGHT"] = {}
@@ -133,13 +135,14 @@ function HealerHelper:AddDispellBorder(frame)
     return DebuffBorder
 end
 
-function HealerHelper:CanDispell(debuffType)
+function HealerHelper:CanDispell(debuffType, spellID)
+    if spellID == nil then return false end
     local _, className = UnitClass("player")
     for i, tab in pairs(dispells[className]) do
-        for spellID, typ in pairs(tab) do
+        for id, typ in pairs(tab) do
             if typ == debuffType then
-                local name = C_Spell.GetSpellInfo(spellID)
-                if name then return true end
+                local hasSpellName = C_Spell.GetSpellInfo(id)
+                if hasSpellName and (spellID ~= debuffSeismischerNachhall or HealerHelper:IsBossCastingSpell(spellSeismischesSchmettern)) then return true end
             end
         end
     end
@@ -178,8 +181,6 @@ function HealerHelper:FoundDispellable()
     )
 end
 
-local spellseismischesSchmettern = 424888
-local debuffSeismischerNachhall = 424889
 function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
     if spellID == 440313 then
         local _, className = UnitClass("player")
@@ -191,7 +192,7 @@ function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
     end
 
     if debuffType then
-        if HealerHelper:CanDispell(debuffType) and (spellID ~= debuffSeismischerNachhall or HealerHelper:IsBossCastingSpell(spellID)) then
+        if HealerHelper:CanDispell(debuffType, spellID) then
             HealerHelper:FoundDispellable()
         end
 
@@ -206,7 +207,7 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 local function OnEvent(self, event)
     local _, subEvent, _, _, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
-    if spellID == spellseismischesSchmettern then
+    if spellID == spellSeismischesSchmettern then
         if subEvent == "SPELL_CAST_START" then
             seismischesSchmettern = true
         elseif subEvent == "SPELL_CAST_SUCCESS" then
@@ -217,5 +218,5 @@ end
 
 frame:SetScript("OnEvent", OnEvent)
 function HealerHelper:IsBossCastingSpell(spellID)
-    return seismischesSchmettern
+    if spellID == spellSeismischesSchmettern then return seismischesSchmettern end
 end
