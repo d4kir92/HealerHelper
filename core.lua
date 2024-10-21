@@ -164,6 +164,150 @@ function HealerHelper:RegisterEvent(frame, event, unit)
     end
 end
 
+local test = false
+local currentlyUpdating = {}
+local function UpdateFramePosition(frame, i, group)
+    if InCombatLockdown() and frame:IsProtected() then
+        C_Timer.After(
+            0.1,
+            function()
+                UpdateFramePosition(frame, i, group)
+            end
+        )
+
+        return
+    end
+
+    local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
+    if frame ~= nil and HealerHelper:IsAllowed(frame) and bar then
+        if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
+            if bar then
+                bar:ClearAllPoints()
+                bar:SetPoint("TOP", frame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
+            end
+        elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+            if bar then
+                bar:ClearAllPoints()
+                bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
+            end
+        else
+            HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+        end
+
+        local direction = FindDirection()
+        local spacingY = 0
+        local spacingX = 0
+        local y = i % 5
+        if y == 0 then
+            y = 5
+        end
+
+        local previousFrame = nil
+        if string.match(frame:GetName(), "CompactPartyFrameMember") then
+            previousFrame = _G["CompactPartyFrameMember" .. (i - 1)]
+        elseif string.match(frame:GetName(), "CompactRaidFrame") then
+            previousFrame = _G["CompactRaidFrame" .. (i - 1)]
+        elseif string.match(frame:GetName(), "CompactRaidGroup") then
+            previousFrame = _G["CompactRaidGroup" .. group .. "Member" .. (i - 1)]
+        end
+
+        if y == 1 then
+            previousFrame = _G["CompactRaidFrame" .. (i - 5)]
+            if previousFrame == nil and group ~= nil then
+                previousFrame = _G["CompactRaidGroup" .. (group - 1) .. "Member1"]
+            end
+
+            if previousFrame then
+                frame:ClearAllPoints()
+                if direction == "DOWN" then
+                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                        frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                    else
+                        frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                    end
+                else
+                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                        frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
+                    else
+                        frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
+                    end
+                end
+            end
+        else
+            if previousFrame then
+                frame:ClearAllPoints()
+                if direction == "DOWN" then
+                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
+                        spacingY = HealerHelper:GetOptionValue("GAPY")
+                    elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
+                        spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
+                    end
+
+                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
+                else
+                    if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
+                        spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
+                    elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
+                        spacingX = HealerHelper:GetOptionValue("GAPX")
+                    end
+
+                    frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
+                end
+            end
+        end
+    end
+
+    currentlyUpdating[frame] = nil
+end
+
+local function AddUpdateFramePosition(frame, i, group)
+    if currentlyUpdating[frame] then return end
+    currentlyUpdating[frame] = true
+    UpdateFramePosition(frame, i, group)
+end
+
+function HealerHelper:UpdateHealBarsLayout()
+    if test then return end
+    test = true
+    if IsInRaid() then
+        local max = MAX_RAID_MEMBERS or 40
+        for i = 1, max do
+            local frame = _G["CompactRaidFrame" .. i]
+            if frame then
+                AddUpdateFramePosition(frame, i)
+            else
+                local group = math.ceil(i / 5)
+                local member = i % 5
+                if member == 0 then
+                    member = 5
+                end
+
+                local frame2 = _G["CompactRaidGroup" .. group .. "Member" .. member]
+                if frame2 then
+                    AddUpdateFramePosition(frame2, member, group)
+                end
+            end
+        end
+    else
+        local max = MEMBERS_PER_RAID_GROUP or 5
+        for i = 1, max do
+            local frame = _G["CompactPartyFrameMember" .. i]
+            if frame == nil then
+                frame = _G["CompactRaidFrame" .. i]
+            end
+
+            if frame then
+                AddUpdateFramePosition(frame, i)
+            else
+                break
+            end
+        end
+    end
+
+    HealerHelper:UpdateStates()
+    test = false
+end
+
 local previousGroupSize = 0
 local searchForNew = false
 function HealerHelper:CheckForNewFrames(oldc)
@@ -317,151 +461,7 @@ healerHelper:SetScript(
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             HealerHelper:CheckForNewFrames()
-            local test = false
-            local currentlyUpdating = {}
-            local function UpdateFramePosition(frame, i, group)
-                if InCombatLockdown() and frame:IsProtected() then
-                    C_Timer.After(
-                        0.1,
-                        function()
-                            UpdateFramePosition(frame, i, group)
-                        end
-                    )
-
-                    return
-                end
-
-                local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
-                if frame ~= nil and HealerHelper:IsAllowed(frame) and bar then
-                    if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
-                        if bar then
-                            bar:ClearAllPoints()
-                            bar:SetPoint("TOP", frame, "BOTTOM", 0, -HealerHelper:GetOptionValue("OFFSET"))
-                        end
-                    elseif HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                        if bar then
-                            bar:ClearAllPoints()
-                            bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
-                        end
-                    else
-                        HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
-                    end
-
-                    local direction = FindDirection()
-                    local spacingY = 0
-                    local spacingX = 0
-                    local y = i % 5
-                    if y == 0 then
-                        y = 5
-                    end
-
-                    local previousFrame = nil
-                    if string.match(frame:GetName(), "CompactPartyFrameMember") then
-                        previousFrame = _G["CompactPartyFrameMember" .. (i - 1)]
-                    elseif string.match(frame:GetName(), "CompactRaidFrame") then
-                        previousFrame = _G["CompactRaidFrame" .. (i - 1)]
-                    elseif string.match(frame:GetName(), "CompactRaidGroup") then
-                        previousFrame = _G["CompactRaidGroup" .. group .. "Member" .. (i - 1)]
-                    end
-
-                    if y == 1 then
-                        previousFrame = _G["CompactRaidFrame" .. (i - 5)]
-                        if previousFrame == nil and group ~= nil then
-                            previousFrame = _G["CompactRaidGroup" .. (group - 1) .. "Member1"]
-                        end
-
-                        if previousFrame then
-                            frame:ClearAllPoints()
-                            if direction == "DOWN" then
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                                    frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                                else
-                                    frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                                end
-                            else
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
-                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
-                                else
-                                    frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
-                                end
-                            end
-                        end
-                    else
-                        if previousFrame then
-                            frame:ClearAllPoints()
-                            if direction == "DOWN" then
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
-                                    spacingY = HealerHelper:GetOptionValue("GAPY")
-                                elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
-                                    spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
-                                end
-
-                                frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
-                            else
-                                if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
-                                    spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
-                                elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
-                                    spacingX = HealerHelper:GetOptionValue("GAPX")
-                                end
-
-                                frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
-                            end
-                        end
-                    end
-                end
-
-                currentlyUpdating[frame] = nil
-            end
-
-            local function AddUpdateFramePosition(frame, i, group)
-                if currentlyUpdating[frame] then return end
-                currentlyUpdating[frame] = true
-                UpdateFramePosition(frame, i, group)
-            end
-
-            function HealerHelper:UpdateHealBarsLayout()
-                if test then return end
-                test = true
-                if IsInRaid() then
-                    local max = MAX_RAID_MEMBERS or 40
-                    for i = 1, max do
-                        local frame = _G["CompactRaidFrame" .. i]
-                        if frame then
-                            AddUpdateFramePosition(frame, i)
-                        else
-                            local group = math.ceil(i / 5)
-                            local member = i % 5
-                            if member == 0 then
-                                member = 5
-                            end
-
-                            local frame2 = _G["CompactRaidGroup" .. group .. "Member" .. member]
-                            if frame2 then
-                                AddUpdateFramePosition(frame2, member, group)
-                            end
-                        end
-                    end
-                else
-                    local max = MEMBERS_PER_RAID_GROUP or 5
-                    for i = 1, max do
-                        local frame = _G["CompactPartyFrameMember" .. i]
-                        if frame == nil then
-                            frame = _G["CompactRaidFrame" .. i]
-                        end
-
-                        if frame then
-                            AddUpdateFramePosition(frame, i)
-                        else
-                            break
-                        end
-                    end
-                end
-
-                HealerHelper:UpdateStates()
-                test = false
-            end
-
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.4"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.5"))
         end
     end
 )
@@ -676,6 +676,9 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
 
         self.actionButtonCastType = actionButtonCastType
+    end
+
+    function customButton:UpdatePressAndHoldAction()
     end
 
     function customButton:ClearReticle()
@@ -1012,6 +1015,18 @@ function HealerHelper:AddHealbar(unitFrame)
 
     local name = unitFrame:GetName()
     if name ~= nil then
+        local setP = false
+        hooksecurefunc(
+            unitFrame,
+            "SetPoint",
+            function()
+                if setP then return end
+                setP = true
+                HealerHelper:UpdateHealBarsLayout()
+                setP = false
+            end
+        )
+
         local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame, "SecureHandlerAttributeTemplate")
         bar:SetSize(10, 10)
         if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
