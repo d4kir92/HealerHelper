@@ -449,7 +449,7 @@ healerHelper:SetScript(
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             HealerHelper:CheckForNewFrames()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.8"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.9"))
         end
     end
 )
