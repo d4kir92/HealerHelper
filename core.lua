@@ -420,7 +420,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.18"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.19"))
             C_Timer.After(
                 1,
                 function()
@@ -743,12 +743,21 @@ function HealerHelper:Unglow(button)
     glowButtons[button]:Hide()
 end
 
+local Counts = {}
 local registered = {}
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
     customButton:UnregisterAllEvents()
+    if Counts[customButton] == nil then
+        Counts[customButton] = customButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        Counts[customButton]:SetPoint("BOTTOMRIGHT", customButton, "BOTTOMRIGHT", -4, 4)
+        Counts[customButton]:SetTextColor(1, 1, 1, 1)
+        local f1, _, f3 = Counts[customButton]:GetFont()
+        Counts[customButton]:SetFont(f1, 18, f3)
+    end
+
     local customButtonEvents = CreateFrame("Frame", name .. "Events_BTN_" .. i)
     customButton:SetAttribute("HEAHEL_bar", bar)
     HealerHelper:UpdateStateBtn(i, customButton)
@@ -803,8 +812,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
     )
 
     function customButton:UpdateCount()
-        if self.Count == nil then return end
-        local text = self.Count
+        if Counts[self] == nil then return end
+        local text = Counts[self]
         if self:GetAttribute("spell") == nil then
             text:SetText("")
 
@@ -1158,12 +1167,12 @@ function HealerHelper:AddActionButton(frame, bar, i)
             customButton.SpellActivationAlert.ProcStartFlipbook:SetScale(textureScale)
         end
 
-        if customButton.Count then
-            customButton.Count:SetScale(0.06)
+        if Counts[customButton] then
+            Counts[customButton]:SetScale(0.06)
             HealerHelper:TryRunSecure(
                 function(btn)
-                    btn.Count:ClearAllPoints()
-                    btn.Count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+                    Counts[btn]:ClearAllPoints()
+                    Counts[btn]:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
                 end, {customButton}, "Charges Reposition", customButton
             )
         end

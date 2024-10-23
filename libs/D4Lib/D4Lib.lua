@@ -119,10 +119,10 @@ function D4:IsSpellInRange(spellID, spellType, unit)
     return nil
 end
 
-function D4:GetSpellCharges(...)
+function D4:GetSpellCharges(spellID)
     if spellID == nil then return nil end
-    if C_Spell and C_Spell.GetSpellCharges then return C_Spell.GetSpellCharges(...) end
-    if GetSpellCharges then return GetSpellCharges(...) end
+    if C_Spell and C_Spell.GetSpellCharges then return C_Spell.GetSpellCharges(spellID) end
+    if GetSpellCharges then return GetSpellCharges(spellID) end
     D4:MSG("[D4][GetSpellCharges] FAILED")
 
     return nil
