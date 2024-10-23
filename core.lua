@@ -420,7 +420,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.15"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.16"))
             C_Timer.After(
                 1,
                 function()
@@ -703,8 +703,10 @@ local function HH_ActionButton_UpdateCooldown(self)
     HH_CooldownFrame_Set(self.cooldown, start, duration, enable, false, modRate)
 end
 
+local glowButtons = {}
 function HealerHelper:SetupGlow(button)
-    if not button.glow then
+    if not glowButtons[button] then
+        glowButtons[button] = true
         local glow = button:CreateTexture(nil, "OVERLAY")
         glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
         glow:SetBlendMode("ADD")
@@ -726,19 +728,17 @@ function HealerHelper:SetupGlow(button)
         fadeIn:SetOrder(2)
         animationGroup:SetLooping("REPEAT")
         animationGroup:Play()
-        button.glow = glow
-        button.animationGroup = animationGroup
     end
 end
 
 function HealerHelper:Glow(button)
     HealerHelper:SetupGlow(button)
-    button.glow:Show()
+    glowButtons[button]:Show()
 end
 
 function HealerHelper:Unglow(button)
     HealerHelper:SetupGlow(button)
-    button.glow:Hide()
+    glowButtons[button]:Hide()
 end
 
 local registered = {}
@@ -1057,13 +1057,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     )
 
-    --[[hooksecurefunc(
-        frame,
-        "SetPoint",
-        function(sel)
-            UpdateDesign(sel)
-        end
-    )]]
     if HealerHelper:GetOptionValue("spell" .. i) ~= nil then
         HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i), i)
     else
@@ -1157,10 +1150,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
         local cooldown = _G[customButton:GetName() .. "Cooldown"]
         if cooldown then
             cooldown:SetScale(textureScale)
-        end
-
-        if ActionButton_SetupOverlayGlow then
-            ActionButton_SetupOverlayGlow(customButton)
         end
 
         if customButton.SpellActivationAlert and customButton.SpellActivationAlert.ProcLoopFlipbook then
