@@ -420,7 +420,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.16"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.17"))
             C_Timer.After(
                 1,
                 function()
@@ -707,7 +707,8 @@ local glowButtons = {}
 function HealerHelper:SetupGlow(button)
     if not glowButtons[button] then
         glowButtons[button] = true
-        local glow = button:CreateTexture(nil, "OVERLAY")
+        glowButtons[button] = button:CreateTexture(nil, "OVERLAY")
+        local glow = glowButtons[button]
         glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
         glow:SetBlendMode("ADD")
         glow:SetPoint("CENTER", button, "CENTER", 0, 0)

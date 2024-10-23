@@ -10,14 +10,14 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion("HealerHelper", "134149", "0.7.16")
+    HealerHelper:SetVersion("HealerHelper", "134149", "0.7.17")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
             ["pTab"] = {"CENTER"},
             ["sw"] = 520,
             ["sh"] = 520,
-            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.7.16")
+            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.7.17")
         }
     )
 
@@ -233,7 +233,7 @@ function HealerHelper:InitSettings()
             ["name"] = "HealerHelper",
             ["icon"] = 134149,
             ["dbtab"] = HEAHELPC,
-            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.7.162"}, {"Leftclick", "Toggle Settings"}},
+            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.7.172"}, {"Leftclick", "Toggle Settings"}},
             ["funcL"] = function()
                 HealerHelper:ToggleSettings()
             end,
