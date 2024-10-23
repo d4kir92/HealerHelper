@@ -167,8 +167,13 @@ local function AddUpdateFramePosition(fra, nr, gro)
                         bar:ClearAllPoints()
                         bar:SetPoint("LEFT", frame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
                     end
+                elseif HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
+                    if bar then
+                        bar:ClearAllPoints()
+                        bar:SetPoint("RIGHT", frame, "LEFT", -HealerHelper:GetOptionValue("OFFSET"), 0)
+                    end
                 else
-                    HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+                    HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #1", HealerHelper:GetOptionValue("LAYOUT"))
                 end
 
                 local direction = FindDirection()
@@ -197,16 +202,20 @@ local function AddUpdateFramePosition(fra, nr, gro)
                     if previousFrame then
                         frame:ClearAllPoints()
                         if direction == "DOWN" then
-                            if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                            if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
                                 frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                            else
+                            elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                                 frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                            else
+                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #2", HealerHelper:GetOptionValue("LAYOUT"))
                             end
                         else
-                            if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" then
+                            if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
                                 frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
-                            else
+                            elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                                 frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
+                            else
+                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #3", HealerHelper:GetOptionValue("LAYOUT"))
                             end
                         end
                     else
@@ -218,18 +227,22 @@ local function AddUpdateFramePosition(fra, nr, gro)
                     if previousFrame then
                         frame:ClearAllPoints()
                         if direction == "DOWN" then
-                            if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "DOWN" then
+                            if (HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT") and direction == "DOWN" then
                                 spacingY = HealerHelper:GetOptionValue("GAPY")
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
                                 spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
+                            else
+                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #4", HealerHelper:GetOptionValue("LAYOUT"))
                             end
 
                             frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
                         else
-                            if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" and direction == "RIGHT" then
+                            if (HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT") and direction == "RIGHT" then
                                 spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
                                 spacingX = HealerHelper:GetOptionValue("GAPX")
+                            else
+                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #5", HealerHelper:GetOptionValue("LAYOUT"))
                             end
 
                             frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
@@ -241,6 +254,9 @@ local function AddUpdateFramePosition(fra, nr, gro)
             currentlyUpdating[frame] = nil
         end, {fra}, "AddUpdateFramePosition", fra, nr, gro
     )
+end
+
+function HealerHelper:UpdatedLayout()
 end
 
 function HealerHelper:UpdateHealBarsLayout()
@@ -281,6 +297,7 @@ function HealerHelper:UpdateHealBarsLayout()
         end
     end
 
+    HealerHelper:UpdatedLayout()
     HealerHelper:UpdateStates()
     test = false
 end
@@ -393,10 +410,14 @@ healerHelper:SetScript(
         elseif event == "ADDON_LOADED" then
             if select(1, ...) ~= AddonName then return end
             HEAHELPC = HEAHELPC or {}
+            HEAHELPC["FLAG"] = HEAHELPC["FLAG"] or true
+            HEAHELPC["FLAGSCALE"] = HEAHELPC["FLAGSCALE"] or 1
             HEAHELPC["LAYOUT"] = HEAHELPC["LAYOUT"] or "BOTTOM"
             HEAHELPC["GAPX"] = HEAHELPC["GAPX"] or 6
             HEAHELPC["GAPY"] = HEAHELPC["GAPY"] or 6
             HEAHELPC["OFFSET"] = HEAHELPC["OFFSET"] or 2
+            HEAHELPC["RFLAG"] = HEAHELPC["RFLAG"] or true
+            HEAHELPC["RFLAGSCALE"] = HEAHELPC["RFLAGSCALE"] or 1
             HEAHELPC["RLAYOUT"] = HEAHELPC["RLAYOUT"] or "BOTTOM"
             HEAHELPC["RGAPX"] = HEAHELPC["RGAPX"] or 4
             HEAHELPC["RGAPY"] = HEAHELPC["RGAPY"] or 4
@@ -407,9 +428,9 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.13"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.14"))
             C_Timer.After(
-                4,
+                1,
                 function()
                     HealerHelper:CheckForNewFrames()
                     HealerHelper:UpdateRaidTargets()
@@ -1032,14 +1053,25 @@ function HealerHelper:AddActionButton(frame, bar, i)
     end
 
     UpdateDesign(frame)
+    local updateBool = false
     hooksecurefunc(
+        HealerHelper,
+        "UpdatedLayout",
+        function()
+            if updateBool then return end
+            updateBool = true
+            UpdateDesign(frame)
+            updateBool = false
+        end
+    )
+
+    --[[hooksecurefunc(
         frame,
         "SetPoint",
         function(sel)
             UpdateDesign(sel)
         end
-    )
-
+    )]]
     if HealerHelper:GetOptionValue("spell" .. i) ~= nil then
         HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i), i)
     else
@@ -1197,8 +1229,13 @@ function HealerHelper:AddHealbar(unitFrame)
                 bar:ClearAllPoints()
                 bar:SetPoint("LEFT", unitFrame, "RIGHT", HealerHelper:GetOptionValue("OFFSET"), 0)
             end
+        elseif HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
+            if bar then
+                bar:ClearAllPoints()
+                bar:SetPoint("RIGHT", unitFrame, "LEFT", -HealerHelper:GetOptionValue("OFFSET"), 0)
+            end
         else
-            HealerHelper:MSG("MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
+            HealerHelper:MSG("[AddHealbar] MISSING LAYOUT", HealerHelper:GetOptionValue("LAYOUT"))
         end
 
         if HealerHelper.DEBUG then
@@ -1224,8 +1261,20 @@ function HealerHelper:AddIcon(frame, name, atlas, texture, p1, p2, p3, p4, p5, f
 
     icon:SetSize(16, 16)
     icon:SetPoint(p1, p2, p3, p4, p5)
+    icon.frame = frame
     icon.func = func
     func(frame, icon)
+
+    return icon
+end
+
+local flags = {}
+function HealerHelper:UpdateFlagStatus()
+    for i, icon in pairs(flags) do
+        if icon.func then
+            icon.func(icon.frame, icon)
+        end
+    end
 end
 
 function HealerHelper:AddIcons(frame)
@@ -1272,7 +1321,7 @@ function HealerHelper:AddIcons(frame)
         end, 0.2, 0.4
     )
 
-    HealerHelper:AddIcon(
+    local flagIcon = HealerHelper:AddIcon(
         frame,
         "HH_Flag",
         nil,
@@ -1295,8 +1344,14 @@ function HealerHelper:AddIcons(frame)
                 return
             end
 
+            if not HealerHelper:GetOptionValue("FLAG", true) then
+                icon:SetTexture(nil)
+
+                return
+            end
+
             icon:SetSize(64, 32)
-            icon:SetScale(0.34)
+            icon:SetScale(0.34 * HealerHelper:GetOptionValue("FLAGSCALE", 1))
             if not UnitIsPlayer(parent.unit) then
                 icon:SetTexture("Interface\\Addons\\HealerHelper\\media\\" .. "bot")
 
@@ -1322,6 +1377,7 @@ function HealerHelper:AddIcons(frame)
         end, 1, 2
     )
 
+    tinsert(flags, flagIcon)
     HealerHelper:AddDispellBorder(frame)
 end
 

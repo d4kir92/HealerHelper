@@ -10,19 +10,19 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion("HealerHelper", "134149", "0.7.13")
+    HealerHelper:SetVersion("HealerHelper", "134149", "0.7.14")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
             ["pTab"] = {"CENTER"},
             ["sw"] = 520,
             ["sh"] = 520,
-            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.7.13")
+            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.7.14")
         }
     )
 
     heahel_settings.SF = CreateFrame("ScrollFrame", "heahel_settings_SF", heahel_settings, "UIPanelScrollFrameTemplate")
-    heahel_settings.SF:SetPoint("TOPLEFT", heahel_settings, 8, -26)
+    heahel_settings.SF:SetPoint("TOPLEFT", heahel_settings, 10, -26)
     heahel_settings.SF:SetPoint("BOTTOMRIGHT", heahel_settings, -32, 8)
     heahel_settings.SC = CreateFrame("Frame", "heahel_settings_SC", heahel_settings.SF)
     heahel_settings.SC:SetSize(heahel_settings.SF:GetSize())
@@ -46,12 +46,33 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendCategory("PARTY")
+    HealerHelper:AppendCheckbox(
+        "FLAG",
+        true,
+        function()
+            HealerHelper:UpdateFlagStatus()
+        end
+    )
+
+    HealerHelper:AppendSlider(
+        "FLAGSCALE",
+        1,
+        0.6,
+        2,
+        0.1,
+        1,
+        function()
+            HealerHelper:UpdateFlagStatus()
+        end
+    )
+
     HealerHelper:AppendDropdown(
         "LAYOUT",
         "BOTTOM",
         {
-            ["BOTTOM"] = "BOTTOM",
-            ["RIGHT"] = "RIGHT"
+            ["BOTTOM"] = HealerHelper:Trans("BOTTOM"),
+            ["RIGHT"] = HealerHelper:Trans("RIGHT"),
+            ["LEFT"] = HealerHelper:Trans("LEFT"),
         },
         function()
             HealerHelper:UpdateHealBarsLayout()
@@ -61,7 +82,7 @@ function HealerHelper:InitSettings()
     HealerHelper:AppendSlider(
         "ACTIONBUTTONPERROW",
         5,
-        1,
+        2,
         6,
         1,
         0,
@@ -119,12 +140,26 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendCategory("RAID")
+    HealerHelper:AppendCheckbox("RFLAG", true)
+    HealerHelper:AppendSlider(
+        "RFLAGSCALE",
+        1,
+        0.6,
+        2,
+        0.1,
+        1,
+        function()
+            HealerHelper:UpdateFlagStatus()
+        end
+    )
+
     HealerHelper:AppendDropdown(
         "RLAYOUT",
         "BOTTOM",
         {
-            ["BOTTOM"] = "BOTTOM",
-            ["RIGHT"] = "RIGHT"
+            ["BOTTOM"] = HealerHelper:Trans("BOTTOM"),
+            ["RIGHT"] = HealerHelper:Trans("RIGHT"),
+            ["LEFT"] = HealerHelper:Trans("LEFT"),
         },
         function()
             HealerHelper:UpdateHealBarsLayout()
@@ -134,7 +169,7 @@ function HealerHelper:InitSettings()
     HealerHelper:AppendSlider(
         "RACTIONBUTTONPERROW",
         5,
-        1,
+        2,
         6,
         1,
         0,
@@ -198,7 +233,7 @@ function HealerHelper:InitSettings()
             ["name"] = "HealerHelper",
             ["icon"] = 134149,
             ["dbtab"] = HEAHELPC,
-            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.7.132"}, {"Leftclick", "Toggle Settings"}},
+            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.7.142"}, {"Leftclick", "Toggle Settings"}},
             ["funcL"] = function()
                 HealerHelper:ToggleSettings()
             end,
