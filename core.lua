@@ -60,7 +60,9 @@ function HealerHelper:UpdateAllowedUnitFrames()
             if HealerHelper:AddUnitFrame("CompactArenaFrameMember" .. i) then
                 c = c + 1
             end
+        end
 
+        if i <= 8 then
             for x = 1, 5 do
                 if HealerHelper:AddUnitFrame("CompactRaidGroup" .. i .. "Member" .. x) then
                     c = c + 1
@@ -453,7 +455,7 @@ healerHelper:SetScript(
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             HealerHelper:CheckForNewFrames()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.10"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.11"))
         end
     end
 )
