@@ -98,8 +98,8 @@ runAfterCombat:SetScript(
     end
 )
 
-function HealerHelper:TryRunSecure(callback, frame, from, ...)
-    if frame == nil then
+function HealerHelper:TryRunSecure(callback, frames, from, ...)
+    if frames == nil then
         HealerHelper:MSG("[TryRunSecure] Missing frame for args", ...)
 
         return
@@ -112,13 +112,17 @@ function HealerHelper:TryRunSecure(callback, frame, from, ...)
     end
 
     local args = {...}
-    if InCombatLockdown() and frame:IsProtected() then
-        callbacks[from] = {
-            callback = callback,
-            args = {...}
-        }
+    if InCombatLockdown() then
+        for i, frame in pairs(frames) do
+            if frame:IsProtected() then
+                callbacks[from] = {
+                    callback = callback,
+                    args = {...}
+                }
 
-        return
+                return
+            end
+        end
     end
 
     callback(unpack(args))
@@ -239,7 +243,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
             end
 
             currentlyUpdating[frame] = nil
-        end, fra, "AddUpdateFramePosition", fra, nr, gro
+        end, {fra}, "AddUpdateFramePosition", fra, nr, gro
     )
 end
 
@@ -449,7 +453,7 @@ healerHelper:SetScript(
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             HealerHelper:CheckForNewFrames()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.9"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.10"))
         end
     end
 )
@@ -458,22 +462,21 @@ function HealerHelper:SetSpellForBtn(b, i)
     if b == nil then return end
     HealerHelper:TryRunSecure(
         function(btn, id)
+            local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
+            if btn.icon then
+                btn.icon:SetTexture(iconTexture)
+            end
+
+            btn:SetAttribute("spell", id)
             btn:SetAttribute("type", "spell")
             btn:SetAttribute("type1", "spell")
-            btn:SetAttribute("spell", id)
             btn:SetAttribute("spell1", id)
-            btn:SetAttribute("action", nil)
-            btn:SetAttribute("action1", nil)
-            btn:SetAttribute("action2", nil)
-            if true then
-                btn.action = nil
-                btn.spellID = id
-                local _, _, iconTexture = HealerHelper:GetSpellInfo(id)
-                if btn.icon then
-                    btn.icon:SetTexture(iconTexture)
-                end
+            if false then
+                btn:SetAttribute("action", nil)
+                btn:SetAttribute("action1", nil)
+                btn:SetAttribute("action2", nil)
             end
-        end, b, "SetSpellForBtn", b, i
+        end, {b}, "SetSpellForBtn", b, i
     )
 end
 
@@ -492,22 +495,20 @@ function HealerHelper:ClearSpellForBtn(b)
     if b == nil then return end
     HealerHelper:TryRunSecure(
         function(btn)
-            btn:SetAttribute("type", nil)
-            btn:SetAttribute("type1", nil)
-            btn:SetAttribute("spell", nil)
-            btn:SetAttribute("spell1", nil)
-            btn:SetAttribute("action", nil)
-            btn:SetAttribute("action1", nil)
-            btn:SetAttribute("action2", nil)
-            if true then
-                btn.action = nil
-                btn.spellID = nil
-            end
-
             if btn.icon then
                 btn.icon:SetTexture(nil)
             end
-        end, b, "ClearSpellForBtn", b
+
+            btn:SetAttribute("spell", nil)
+            btn:SetAttribute("type", nil)
+            btn:SetAttribute("type1", nil)
+            btn:SetAttribute("spell1", nil)
+            if false then
+                btn:SetAttribute("action", nil)
+                btn:SetAttribute("action1", nil)
+                btn:SetAttribute("action2", nil)
+            end
+        end, {b}, "ClearSpellForBtn", b
     )
 end
 
@@ -566,11 +567,212 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
     return dispellableCount, debuffColor
 end
 
+local function HH_CooldownFrame_Set(cooldownFrame, start, duration, enable, showCooldownFrame)
+    if enable and enable ~= 0 and duration > 0 then
+        cooldownFrame:SetCooldown(start, duration)
+        if showCooldownFrame then
+            cooldownFrame:Show()
+        end
+    else
+        cooldownFrame:Hide()
+    end
+end
+
+local numChargeCooldowns = 0
+local function HH_CreateChargeCooldownFrame(parent)
+    numChargeCooldowns = numChargeCooldowns + 1
+    local cooldown = CreateFrame("Cooldown", "ChargeCooldown" .. numChargeCooldowns, parent, "CooldownFrameTemplate")
+    cooldown:SetHideCountdownNumbers(true)
+    cooldown:SetDrawSwipe(false)
+    local icon = parent.Icon or parent.icon
+    cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
+    cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
+    cooldown:SetFrameLevel(parent:GetFrameLevel())
+
+    return cooldown
+end
+
+local function HH_StartChargeCooldown(frame, cooldownFrame, start, duration, chargeStart, chargeDuration, chargeMax, charges)
+    cooldownFrame = cooldownFrame or HH_CreateChargeCooldownFrame(frame)
+    if charges and charges < chargeMax then
+        cooldownFrame:SetCooldown(chargeStart, chargeDuration)
+        cooldownFrame:Show()
+        if cooldownFrame.chargeText then
+            cooldownFrame.chargeText:SetText(charges)
+            cooldownFrame.chargeText:Show()
+        end
+    else
+        cooldownFrame:Hide()
+    end
+end
+
+local function HH_ClearChargeCooldown(frame, cooldownFrame)
+    cooldownFrame = cooldownFrame or HH_CreateChargeCooldownFrame(frame)
+    cooldownFrame:Hide()
+    if cooldownFrame.chargeText then
+        cooldownFrame.chargeText:Hide()
+    end
+end
+
+local function HH_RETAIL_ActionButton_UpdateCooldown(self)
+    local locStart, locDuration
+    local start, duration, enable, charges, maxCharges, chargeStart, chargeDuration
+    local modRate = 1.0
+    local chargeModRate = 1.0
+    local actionType, actionID = nil
+    local auraData = nil
+    local passiveCooldownSpellID = nil
+    local onEquipPassiveSpellID = nil
+    if onEquipPassiveSpellID then
+        passiveCooldownSpellID = C_UnitAuras.GetCooldownAuraBySpellID(onEquipPassiveSpellID)
+    elseif (actionType and actionType == "spell") and actionID then
+        passiveCooldownSpellID = C_UnitAuras.GetCooldownAuraBySpellID(actionID)
+    elseif self:GetAttribute("spell") then
+        passiveCooldownSpellID = C_UnitAuras.GetCooldownAuraBySpellID(self:GetAttribute("spell"))
+    end
+
+    if passiveCooldownSpellID and passiveCooldownSpellID ~= 0 then
+        auraData = C_UnitAuras.GetPlayerAuraBySpellID(passiveCooldownSpellID)
+    end
+
+    if auraData then
+        local currentTime = GetTime()
+        local timeUntilExpire = auraData.expirationTime - currentTime
+        local howMuchTimeHasPassed = auraData.duration - timeUntilExpire
+        locStart = currentTime - howMuchTimeHasPassed
+        locDuration = auraData.expirationTime - currentTime
+        start = currentTime - howMuchTimeHasPassed
+        duration = auraData.duration
+        modRate = auraData.timeMod
+        charges = auraData.charges
+        maxCharges = auraData.maxCharges
+        chargeStart = currentTime * 0.001
+        chargeDuration = duration * 0.001
+        chargeModRate = modRate
+        enable = 1
+    elseif self:GetAttribute("spell") then
+        locStart, locDuration = C_Spell.GetSpellLossOfControlCooldown(self:GetAttribute("spell"))
+        local spellCooldownInfo = C_Spell.GetSpellCooldown(self:GetAttribute("spell")) or {
+            startTime = 0,
+            duration = 0,
+            isEnabled = false,
+            modRate = 0
+        }
+
+        start, duration, enable, modRate = spellCooldownInfo.startTime, spellCooldownInfo.duration, spellCooldownInfo.isEnabled, spellCooldownInfo.modRate
+        local chargeInfo = HealerHelper:GetSpellCharges(self:GetAttribute("spell")) or {
+            currentCharges = 0,
+            maxCharges = 0,
+            cooldownStartTime = 0,
+            cooldownDuration = 0,
+            chargeModRate = 0
+        }
+
+        charges, maxCharges, chargeStart, chargeDuration, chargeModRate = chargeInfo.currentCharges, chargeInfo.maxCharges, chargeInfo.cooldownStartTime, chargeInfo.cooldownDuration, chargeInfo.chargeModRate
+    end
+
+    if locStart and locDuration and start and duration then
+        if (locStart + locDuration) > (start + duration) then
+            if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_LOSS_OF_CONTROL then
+                self.cooldown:SetEdgeTexture("Interface\\Cooldown\\UI-HUD-ActionBar-LoC")
+                self.cooldown:SetSwipeColor(0.17, 0, 0)
+                self.cooldown:SetHideCountdownNumbers(true)
+                self.cooldown.currentCooldownType = COOLDOWN_TYPE_LOSS_OF_CONTROL
+            end
+
+            HH_CooldownFrame_Set(self.cooldown, locStart, locDuration, true, true, modRate)
+            self.cooldown:SetScript("OnCooldownDone", ActionButtonCooldown_OnCooldownDone, false)
+            HH_ClearChargeCooldown(self, self.chargeCooldown)
+        else
+            if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_NORMAL then
+                self.cooldown:SetEdgeTexture("Interface\\Cooldown\\UI-HUD-ActionBar-SecondaryCooldown")
+                self.cooldown:SetSwipeColor(0, 0, 0)
+                self.cooldown:SetHideCountdownNumbers(false)
+                self.cooldown.currentCooldownType = COOLDOWN_TYPE_NORMAL
+            end
+
+            self.cooldown:SetScript("OnCooldownDone", ActionButtonCooldown_OnCooldownDone, locStart > 0)
+            if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
+                HH_StartChargeCooldown(self, self.chargeCooldown, chargeStart, chargeDuration, chargeModRate)
+            else
+                HH_ClearChargeCooldown(self, self.chargeCooldown)
+            end
+
+            HH_CooldownFrame_Set(self.cooldown, start, duration, enable, false, modRate)
+        end
+    end
+end
+
+local function HH_ActionButton_UpdateCooldown(self)
+    local start, duration, enable, charges, maxCharges, chargeStart, chargeDuration
+    local modRate = 1.0
+    local chargeModRate = 1.0
+    if self:GetAttribute("spell") then
+        start, duration, enable, modRate = GetSpellCooldown(self:GetAttribute("spell"))
+        charges, maxCharges, chargeStart, chargeDuration, chargeModRate = HealerHelper:GetSpellCharges(self:GetAttribute("spell"))
+    end
+
+    if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_NORMAL then
+        self.cooldown:SetEdgeTexture("Interface\\Cooldown\\edge")
+        self.cooldown:SetSwipeColor(0, 0, 0)
+        self.cooldown:SetHideCountdownNumbers(false)
+        self.cooldown.currentCooldownType = COOLDOWN_TYPE_NORMAL
+    end
+
+    if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
+        HH_StartChargeCooldown(self, self.chargeCooldown, chargeStart, chargeDuration, chargeModRate)
+    else
+        HH_ClearChargeCooldown(self, self.chargeCooldown)
+    end
+
+    HH_CooldownFrame_Set(self.cooldown, start, duration, enable, false, modRate)
+end
+
+function HealerHelper:SetupGlow(button)
+    if not button.glow then
+        local glow = button:CreateTexture(nil, "OVERLAY")
+        glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        glow:SetBlendMode("ADD")
+        glow:SetPoint("CENTER", button, "CENTER", 0, 0)
+        glow:SetWidth(button:GetWidth() * 1.7)
+        glow:SetHeight(button:GetHeight() * 1.7)
+        local animationGroup = glow:CreateAnimationGroup()
+        local fadeOut = animationGroup:CreateAnimation("Alpha")
+        fadeOut:SetFromAlpha(1)
+        fadeOut:SetToAlpha(0.5)
+        fadeOut:SetDuration(0.6)
+        fadeOut:SetSmoothing("IN_OUT")
+        fadeOut:SetOrder(1)
+        local fadeIn = animationGroup:CreateAnimation("Alpha")
+        fadeIn:SetFromAlpha(0.5)
+        fadeIn:SetToAlpha(1)
+        fadeIn:SetDuration(0.6)
+        fadeIn:SetSmoothing("IN_OUT")
+        fadeIn:SetOrder(2)
+        animationGroup:SetLooping("REPEAT")
+        animationGroup:Play()
+        button.glow = glow
+        button.animationGroup = animationGroup
+    end
+end
+
+function HealerHelper:Glow(button)
+    HealerHelper:SetupGlow(button)
+    button.glow:Show()
+end
+
+function HealerHelper:Unglow(button)
+    HealerHelper:SetupGlow(button)
+    button.glow:Hide()
+end
+
 local registered = {}
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
+    customButton:UnregisterAllEvents()
+    local customButtonEvents = CreateFrame("Frame", name .. "Events_BTN_" .. i)
     if customButton.Count == nil then
         customButton.Count = customButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         customButton.Count:SetPoint("BOTTOMRIGHT", customButton, "BOTTOMRIGHT", -2, 2)
@@ -585,50 +787,34 @@ function HealerHelper:AddActionButton(frame, bar, i)
     customButton:SetAttribute("HEAHEL_bar", bar)
     HealerHelper:UpdateStateBtn(i, customButton)
     registered[customButton] = false
-    function customButton:UpdateCount()
-        if self.Count == nil then return end
-        local text = self.Count
-        if self:GetAttribute("spell") == nil then
-            text:SetText("")
-
-            return
-        end
-
-        local info = C_Spell.GetSpellCharges(self:GetAttribute("spell"))
-        if info and info.currentCharges ~= nil and info.maxCharges ~= nil then
-            if info.maxCharges > 1 then
-                text:SetText(info.currentCharges)
-            else
-                text:SetText("")
-            end
-        elseif C_Spell.GetSpellCastCount(self:GetAttribute("spell")) > 0 then
-            text:SetText(C_Spell.GetSpellCastCount(self:GetAttribute("spell")))
-        else
-            text:SetText("")
-        end
-    end
-
     function customButton:RegisterEvents()
         registered[customButton] = true
         customButton:UnregisterAllEvents()
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_INTERRUPTED", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SUCCEEDED", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_FAILED", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_START", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_STOP", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_START", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_CHANNEL_STOP", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_TARGET", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_RETICLE_CLEAR", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_START", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_EMPOWER_STOP", "player")
-        HealerHelper:RegisterEvent(customButton, "UNIT_SPELLCAST_SENT")
-        HealerHelper:RegisterEvent(customButton, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
-        HealerHelper:RegisterEvent(customButton, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
-        HealerHelper:RegisterEvent(customButton, "SPELL_UPDATE_ICON")
-        HealerHelper:RegisterEvent(customButton, "SPELL_UPDATE_CHARGES")
-        HealerHelper:RegisterEvent(customButton, "ACTIONBAR_UPDATE_STATE")
-        HealerHelper:RegisterEvent(customButton, "ACTIONBAR_UPDATE_COOLDOWN")
+        customButtonEvents:UnregisterAllEvents()
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_INTERRUPTED", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_SUCCEEDED", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_FAILED", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_START", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_STOP", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_CHANNEL_START", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_CHANNEL_STOP", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_RETICLE_TARGET", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_RETICLE_CLEAR", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_EMPOWER_START", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_EMPOWER_STOP", "player")
+        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_SENT")
+        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
+        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
+        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_UPDATE_ICON")
+        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_UPDATE_CHARGES")
+        HealerHelper:RegisterEvent(customButtonEvents, "ACTIONBAR_UPDATE_STATE")
+        HealerHelper:RegisterEvent(customButtonEvents, "ACTIONBAR_UPDATE_COOLDOWN")
+        HealerHelper:RegisterEvent(customButtonEvents, "LOSS_OF_CONTROL_UPDATE")
+        HealerHelper:RegisterEvent(customButtonEvents, "LOSS_OF_CONTROL_ADDED")
+    end
+
+    if customButton.SpellCastAnimFrame then
+        customButton.SpellCastAnimFrame:SetScript("OnHide", function() end)
     end
 
     if registered[customButton] == false then
@@ -646,10 +832,34 @@ function HealerHelper:AddActionButton(frame, bar, i)
             else
                 if registered[customButton] == true then
                     customButton:UnregisterAllEvents()
+                    customButtonEvents:UnregisterAllEvents()
                 end
             end
         end
     )
+
+    function customButton:UpdateCount()
+        if self.Count == nil then return end
+        local text = self.Count
+        if self:GetAttribute("spell") == nil then
+            text:SetText("")
+
+            return
+        end
+
+        local info = HealerHelper:GetSpellCharges(self:GetAttribute("spell"))
+        if info and info.currentCharges ~= nil and info.maxCharges ~= nil then
+            if info.maxCharges > 1 then
+                text:SetText(info.currentCharges)
+            else
+                text:SetText("")
+            end
+        elseif HealerHelper:GetSpellCastCount(self:GetAttribute("spell")) and HealerHelper:GetSpellCastCount(self:GetAttribute("spell")) > 0 then
+            text:SetText(HealerHelper:GetSpellCastCount(self:GetAttribute("spell")))
+        else
+            text:SetText("")
+        end
+    end
 
     function customButton:PlaySpellCastAnim(actionButtonCastType)
         if self.cooldown then
@@ -711,7 +921,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
 
     function customButton:PlaySpellInterruptedAnim()
         self:StopSpellCastAnim(true, self.actionButtonCastType)
-        --Hide if it's already showing to clear the anim. 
         if self.InterruptDisplay and self.InterruptDisplay:IsShown() then
             self.InterruptDisplay:Hide()
         end
@@ -726,64 +935,68 @@ function HealerHelper:AddActionButton(frame, bar, i)
     customButton:SetScript("OnHide", function(sel) end)
     customButton:SetScript("OnEnter", function(sel) end)
     customButton:SetScript("OnLeave", function(sel) end)
-    customButton:SetScript(
+    customButtonEvents:SetScript(
         "OnEvent",
         function(sel, event, ...)
             local spellID = select(3, ...)
             if spellID == customButton:GetAttribute("spell") or spellID == nil then
-                if event == "ACTIONBAR_UPDATE_COOLDOWN" then
+                if event == "ACTIONBAR_UPDATE_COOLDOWN" or event == "LOSS_OF_CONTROL_ADDED" or event == "LOSS_OF_CONTROL_UPDATE" then
                     if customButton:GetAttribute("spell") then
-                        ActionButton_UpdateCooldown(customButton)
+                        if HealerHelper:GetWoWBuild() == "RETAIL" then
+                            HH_RETAIL_ActionButton_UpdateCooldown(customButton)
+                        else
+                            HH_ActionButton_UpdateCooldown(customButton)
+                        end
                     end
                 elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
                     spellID = select(1, ...)
                     if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_ShowOverlayGlow then
-                        ActionButton_ShowOverlayGlow(sel)
+                        HealerHelper:Glow(customButton)
                     end
                 elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
                     spellID = select(1, ...)
                     if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_HideOverlayGlow then
-                        ActionButton_HideOverlayGlow(sel)
+                        HealerHelper:Unglow(customButton)
                     end
                 elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
-                    sel:PlaySpellInterruptedAnim()
+                    customButton:PlaySpellInterruptedAnim()
                 elseif event == "UNIT_SPELLCAST_START" then
-                    sel:PlaySpellCastAnim(ActionButtonCastType.Cast)
+                    customButton:PlaySpellCastAnim(ActionButtonCastType.Cast)
                 elseif event == "UNIT_SPELLCAST_STOP" then
-                    sel:StopSpellCastAnim(true, ActionButtonCastType.Cast)
-                    sel:StopTargettingReticleAnim()
+                    customButton:StopSpellCastAnim(true, ActionButtonCastType.Cast)
+                    customButton:StopTargettingReticleAnim()
                 elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-                    sel:StopSpellCastAnim(false, ActionButtonCastType.Cast)
-                    sel:StopTargettingReticleAnim()
+                    customButton:StopSpellCastAnim(false, ActionButtonCastType.Cast)
+                    customButton:StopTargettingReticleAnim()
                 elseif event == "UNIT_SPELLCAST_SENT" or event == "UNIT_SPELLCAST_FAILED" then
-                    sel:StopTargettingReticleAnim()
+                    customButton:StopTargettingReticleAnim()
                 elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
-                    sel:PlaySpellCastAnim(ActionButtonCastType.Empowered)
+                    customButton:PlaySpellCastAnim(ActionButtonCastType.Empowered)
                 elseif event == "UNIT_SPELLCAST_EMPOWER_STOP" then
                     local _, _, _, castComplete = ...
                     local interrupted = not castComplete
                     if interrupted then
-                        sel:PlaySpellInterruptedAnim()
+                        customButton:PlaySpellInterruptedAnim()
                     else
-                        sel:StopSpellCastAnim(interrupted, ActionButtonCastType.Empowered)
+                        customButton:StopSpellCastAnim(interrupted, ActionButtonCastType.Empowered)
                     end
                 elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
-                    sel:PlaySpellCastAnim(ActionButtonCastType.Channel)
+                    customButton:PlaySpellCastAnim(ActionButtonCastType.Channel)
                 elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
-                    sel:StopSpellCastAnim(false, ActionButtonCastType.Channel)
+                    customButton:StopSpellCastAnim(false, ActionButtonCastType.Channel)
                 elseif event == "UNIT_SPELLCAST_RETICLE_TARGET" then
-                    sel:PlayTargettingReticleAnim()
+                    customButton:PlayTargettingReticleAnim()
                 elseif event == "UNIT_SPELLCAST_RETICLE_CLEAR" then
-                    sel:StopTargettingReticleAnim()
+                    customButton:StopTargettingReticleAnim()
+                elseif event == "SPELL_UPDATE_CHARGES" then
+                    customButton:UpdateCount()
+                elseif event == "ACTIONBAR_UPDATE_STATE" then
+                    customButton:UpdateCount()
                 elseif event == "SPELL_UPDATE_ICON" then
                     local _, _, iconTexture = HealerHelper:GetSpellInfo(customButton:GetAttribute("spell"))
                     if customButton.icon then
                         customButton.icon:SetTexture(iconTexture)
                     end
-                elseif event == "SPELL_UPDATE_CHARGES" then
-                    customButton:UpdateCount()
-                elseif event == "ACTIONBAR_UPDATE_STATE" then
-                    customButton:UpdateCount()
                 end
             end
         end
@@ -797,7 +1010,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 btn:SetAttribute("action1", nil)
                 btn:SetAttribute("action2", nil)
                 btn:SetAttribute("ignoreModifiers", "true")
-            end, customButton, "AddActionButton", customButton, frame
+            end, {customButton}, "AddActionButton", customButton, frame
         )
     end
 
@@ -810,6 +1023,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 btn:SetFrameRef("unitFrame", parent)
                 btn:SetFrameRef("bar", bar)
                 btn:SetFrameRef("HEAHEL_HIDDEN", parent)
+            else
+                HealerHelper:MSG("MISSING SetFrameRef")
             end
 
             btn:SetAttribute("i", i)
@@ -833,7 +1048,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                     end
                 end
             )
-        end, customButton, "SecureActionButtons", customButton, frame
+        end, {customButton, frame, bar}, "SecureActionButtons", customButton, frame
     )
 
     local function UpdateDesign(sel)
@@ -973,7 +1188,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 function(btn)
                     btn.Count:ClearAllPoints()
                     btn.Count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
-                end, customButton, "Charges Reposition", customButton
+                end, {customButton}, "Charges Reposition", customButton
             )
         end
     end
@@ -1103,8 +1318,8 @@ function HealerHelper:AddIcons(frame)
         "TOPRIGHT",
         frame,
         "TOPRIGHT",
-        1,
-        -7,
+        -2,
+        -8,
         function(parent, icon)
             if InCombatLockdown() then
                 icon:SetTexture(nil)
@@ -1204,7 +1419,7 @@ function HealerHelper:AddTexts(frame)
                 else
                     text:SetText(t)
                 end
-            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1, 2
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 2
         )
 
         HealerHelper:AddTextStr(
@@ -1251,7 +1466,7 @@ function HealerHelper:AddTexts(frame)
                 else
                     text:SetText("")
                 end
-            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 0, 1, 2
+            end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 2
         )
     end
 end
