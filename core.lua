@@ -362,10 +362,7 @@ healerHelper:SetScript(
                 local currentGroupSize = GetNumGroupMembers()
                 if currentGroupSize ~= previousGroupSize then
                     previousGroupSize = currentGroupSize
-                    print("CHECK FOR NEW")
                     HealerHelper:CheckForNewFrames()
-                else
-                    print("SAME SIZE")
                 end
 
                 HealerHelper:UpdateRaidTargets()
@@ -410,7 +407,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.12"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.13"))
             C_Timer.After(
                 4,
                 function()
