@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\..\Blizzard_SharedXML\UI.xsd">
-    <CheckButton name="HealerHelperActionButtonTemplate" inherits="SecureActionButtonTemplate, ActionButtonSpellFXTemplate, SecureHandlerAttributeTemplate" virtual="true" mixin="BaseActionButtonMixin" >
-        <Size x="45" y="45"/>
+    <CheckButton name="HealerHelperActionButtonTemplate" inherits="SecureActionButtonTemplate" virtual="true" >
+       <Size x="45" y="45"/>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture name="$parentIcon" parentKey="icon" />
@@ -69,58 +69,6 @@
 		</Animations>
 
 		<Frames>
-			<Frame parentKey="TextOverlayContainer" mixin="ActionButtonTextOverlayContainerMixin" frameLevel="500" setAllPoints="true">
-				<Layers>
-					<Layer level="OVERLAY">
-						<FontString name="$parentHotKey" inherits="NumberFontNormalSmallGray" parentKey="HotKey" justifyH="RIGHT">
-							<Size x="32" y="10"/>
-							<Anchors>
-								<Anchor point="TOPRIGHT" x="-5" y="-5"/>
-							</Anchors>
-						</FontString>
-						<FontString name="$parentCount" inherits="NumberFontNormal" parentKey="Count" justifyH="RIGHT">
-							<Anchors>
-								<Anchor point="BOTTOMRIGHT" x="-5" y="5"/>
-							</Anchors>
-						</FontString>
-					</Layer>
-				</Layers>
-				<Scripts>
-					<OnLoad method="OnLoad"/>
-				</Scripts>
-			</Frame>
-			<Frame parentKey="FlyoutArrowContainer" setAllPoints="true">
-				<Layers>
-					<Layer level="ARTWORK" textureSubLevel="2">
-						<Texture parentKey="FlyoutArrowNormal" atlas="UI-HUD-ActionBar-Flyout" hidden="true">
-							<Size x="18" y="7"/>
-							<Anchors>
-								<Anchor point="TOP"/>
-							</Anchors>
-						</Texture>
-						<Texture parentKey="FlyoutArrowPushed" atlas="UI-HUD-ActionBar-Flyout-Down" hidden="true">
-							<Size x="19" y="8"/>
-							<Anchors>
-								<Anchor point="TOP"/>
-							</Anchors>
-						</Texture>
-						<Texture parentKey="FlyoutArrowHighlight" atlas="UI-HUD-ActionBar-Flyout-Mouseover" hidden="true">
-							<Size x="18" y="7"/>
-							<Anchors>
-								<Anchor point="TOP"/>
-							</Anchors>
-						</Texture>
-					</Layer>
-				</Layers>
-			</Frame>
-
-			<Frame parentKey="AutoCastOverlay" inherits="AutoCastOverlayTemplate" hidden="true">
-				<Anchors>
-					<Anchor point="CENTER" x="0" y="0"/>
-				</Anchors>
-				<Size x="45" y="45"/>
-			</Frame>
-
 			<Cooldown name="$parentCooldown" inherits="CooldownFrameTemplate" drawBling="false" useParentLevel="true" parentKey="cooldown">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.icon" x="3" y="-3"/>

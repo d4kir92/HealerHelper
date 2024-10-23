@@ -420,7 +420,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.17"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.18"))
             C_Timer.After(
                 1,
                 function()
@@ -553,39 +553,38 @@ local function HH_CooldownFrame_Set(cooldownFrame, start, duration, enable, show
     end
 end
 
-local numChargeCooldowns = 0
+local chargeCooldowns = {}
 local function HH_CreateChargeCooldownFrame(parent)
-    numChargeCooldowns = numChargeCooldowns + 1
-    local cooldown = CreateFrame("Cooldown", "ChargeCooldown" .. numChargeCooldowns, parent, "CooldownFrameTemplate")
-    cooldown:SetHideCountdownNumbers(true)
-    cooldown:SetDrawSwipe(false)
+    chargeCooldowns[parent] = CreateFrame("Cooldown", nil, parent, "CooldownFrameTemplate")
+    chargeCooldowns[parent]:SetHideCountdownNumbers(true)
+    chargeCooldowns[parent]:SetDrawSwipe(false)
     local icon = parent.Icon or parent.icon
-    cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
-    cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
-    cooldown:SetFrameLevel(parent:GetFrameLevel())
+    chargeCooldowns[parent]:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
+    chargeCooldowns[parent]:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
+    chargeCooldowns[parent]:SetFrameLevel(parent:GetFrameLevel())
 
-    return cooldown
+    return chargeCooldowns[parent]
 end
 
-local function HH_StartChargeCooldown(frame, cooldownFrame, start, duration, chargeStart, chargeDuration, chargeMax, charges)
-    cooldownFrame = cooldownFrame or HH_CreateChargeCooldownFrame(frame)
+local function HH_StartChargeCooldown(frame, start, duration, chargeStart, chargeDuration, chargeMax, charges)
+    chargeCooldowns[frame] = chargeCooldowns[frame] or HH_CreateChargeCooldownFrame(frame)
     if charges and charges < chargeMax then
-        cooldownFrame:SetCooldown(chargeStart, chargeDuration)
-        cooldownFrame:Show()
-        if cooldownFrame.chargeText then
-            cooldownFrame.chargeText:SetText(charges)
-            cooldownFrame.chargeText:Show()
+        chargeCooldowns[frame]:SetCooldown(chargeStart, chargeDuration)
+        chargeCooldowns[frame]:Show()
+        if chargeCooldowns[frame].chargeText then
+            chargeCooldowns[frame].chargeText:SetText(charges)
+            chargeCooldowns[frame].chargeText:Show()
         end
     else
-        cooldownFrame:Hide()
+        chargeCooldowns[frame]:Hide()
     end
 end
 
-local function HH_ClearChargeCooldown(frame, cooldownFrame)
-    cooldownFrame = cooldownFrame or HH_CreateChargeCooldownFrame(frame)
-    cooldownFrame:Hide()
-    if cooldownFrame.chargeText then
-        cooldownFrame.chargeText:Hide()
+local function HH_ClearChargeCooldown(frame)
+    chargeCooldowns[frame] = chargeCooldowns[frame] or HH_CreateChargeCooldownFrame(frame)
+    chargeCooldowns[frame]:Hide()
+    if chargeCooldowns[frame].chargeText then
+        chargeCooldowns[frame].chargeText:Hide()
     end
 end
 
@@ -604,7 +603,9 @@ local defaultChargeInfo = {
     chargeModRate = 0
 }
 
+local currentCooldownType = {}
 local function HH_RETAIL_ActionButton_UpdateCooldown(self)
+    if self.cooldown == nil then return end
     local locStart, locDuration
     local start, duration, enable, charges, maxCharges, chargeStart, chargeDuration
     local modRate = 1.0
@@ -650,27 +651,27 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
 
     if locStart and locDuration and start and duration then
         if (locStart + locDuration) > (start + duration) then
-            if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_LOSS_OF_CONTROL then
+            if currentCooldownType[self.cooldown] ~= COOLDOWN_TYPE_LOSS_OF_CONTROL then
                 self.cooldown:SetEdgeTexture("Interface\\Cooldown\\UI-HUD-ActionBar-LoC")
                 self.cooldown:SetSwipeColor(0.17, 0, 0)
                 self.cooldown:SetHideCountdownNumbers(true)
-                self.cooldown.currentCooldownType = COOLDOWN_TYPE_LOSS_OF_CONTROL
+                currentCooldownType[self.cooldown] = COOLDOWN_TYPE_LOSS_OF_CONTROL
             end
 
             HH_CooldownFrame_Set(self.cooldown, locStart, locDuration, true, true, modRate)
-            HH_ClearChargeCooldown(self, self.chargeCooldown)
+            HH_ClearChargeCooldown(self)
         else
-            if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_NORMAL then
+            if currentCooldownType[self.cooldown] ~= COOLDOWN_TYPE_NORMAL then
                 self.cooldown:SetEdgeTexture("Interface\\Cooldown\\UI-HUD-ActionBar-SecondaryCooldown")
                 self.cooldown:SetSwipeColor(0, 0, 0)
                 self.cooldown:SetHideCountdownNumbers(false)
-                self.cooldown.currentCooldownType = COOLDOWN_TYPE_NORMAL
+                currentCooldownType[self.cooldown] = COOLDOWN_TYPE_NORMAL
             end
 
             if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
-                HH_StartChargeCooldown(self, self.chargeCooldown, chargeStart, chargeDuration, chargeModRate)
+                HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate)
             else
-                HH_ClearChargeCooldown(self, self.chargeCooldown)
+                HH_ClearChargeCooldown(self)
             end
 
             HH_CooldownFrame_Set(self.cooldown, start, duration, enable, false, modRate)
@@ -749,17 +750,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
     customButton:UnregisterAllEvents()
     local customButtonEvents = CreateFrame("Frame", name .. "Events_BTN_" .. i)
-    if customButton.Count == nil then
-        customButton.Count = customButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        customButton.Count:SetPoint("BOTTOMRIGHT", customButton, "BOTTOMRIGHT", -2, 2)
-        customButton.Count:SetTextColor(1, 1, 1, 1)
-    end
-
-    if customButton.cooldown == nil then
-        customButton.cooldown = CreateFrame("Cooldown", nil, customButton, "CooldownFrameTemplate")
-        customButton.cooldown:SetAllPoints(customButton)
-    end
-
     customButton:SetAttribute("HEAHEL_bar", bar)
     HealerHelper:UpdateStateBtn(i, customButton)
     registered[customButton] = false
@@ -992,28 +982,31 @@ function HealerHelper:AddActionButton(frame, bar, i)
 
     HealerHelper:TryRunSecure(
         function(btn, parent)
+            local handler = CreateFrame("Frame", nil, nil, "SecureHandlerAttributeTemplate")
             btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
             btn:SetAttribute("ROWS", HealerHelper:GetOptionValue("ROWS", 2))
             btn:SetAttribute("HEAHEL_bar", bar)
-            if btn.SetFrameRef then
-                btn:SetFrameRef("unitFrame", parent)
-                btn:SetFrameRef("bar", bar)
-                btn:SetFrameRef("HEAHEL_HIDDEN", parent)
+            btn:SetAttribute("i", i)
+            if handler.SetFrameRef then
+                handler:SetFrameRef("actionButton", btn)
+                handler:SetFrameRef("unitFrame", parent)
+                handler:SetFrameRef("bar", bar)
+                handler:SetFrameRef("HEAHEL_HIDDEN", parent)
             else
                 HealerHelper:MSG("MISSING SetFrameRef")
             end
 
-            btn:SetAttribute("i", i)
-            btn:SetAttribute("_onattributechanged", [[
+            handler:SetAttribute("_onattributechanged", [[
                     if name == "state-unit" then                       
                         local unitFrame = self:GetFrameRef("unitFrame")
-                        if unitFrame then
+                        local actionButton = self:GetFrameRef("actionButton")
+                        if unitFrame and actionButton then
                             local unit = unitFrame:GetAttribute("unit")
-                            self:SetAttribute("unit", unit)
+                            actionButton:SetAttribute("unit", unit)
                         end
                     end
                 ]])
-            RegisterStateDriver(btn, "unit", "[combat] none; [nocombat] party1")
+            RegisterStateDriver(handler, "unit", "[combat] none; [nocombat] party1")
             frame:HookScript(
                 "OnAttributeChanged",
                 function(sel, nam, valu)
@@ -1034,15 +1027,22 @@ function HealerHelper:AddActionButton(frame, bar, i)
         local sw = sel:GetWidth()
         bar:SetWidth(sw)
         bar:SetHeight(sw / ACTIONBUTTONPERROW * ROWS)
-        local scale = sw / (customButton:GetWidth() * ACTIONBUTTONPERROW)
         local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
         local col = (i - 1) % ACTIONBUTTONPERROW
         local xOffset = col * customButton:GetWidth()
         local yOffset = row * -customButton:GetHeight()
         if InCombatLockdown() and customButton:IsProtected() then return end
-        customButton:SetScale(scale)
+        if customButton:GetWidth() and customButton:GetWidth() > 0 and ACTIONBUTTONPERROW and ACTIONBUTTONPERROW > 0 then
+            local scale = sw / (customButton:GetWidth() * ACTIONBUTTONPERROW)
+            if scale and scale > 0 then
+                customButton:SetScale(scale)
+            end
+        end
+
         customButton:ClearAllPoints()
-        customButton:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset)
+        if bar and xOffset and yOffset then
+            customButton:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset)
+        end
     end
 
     UpdateDesign(frame)
