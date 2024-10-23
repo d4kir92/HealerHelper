@@ -52,14 +52,8 @@ end
 function HealerHelper:UpdateAllowedUnitFrames()
     local c = 0
     for i = 1, 40 do
-        if i <= 5 then
-            if HealerHelper:AddUnitFrame("CompactPartyFrameMember" .. i) then
-                c = c + 1
-            end
-
-            if HealerHelper:AddUnitFrame("CompactArenaFrameMember" .. i) then
-                c = c + 1
-            end
+        if i <= 5 and HealerHelper:AddUnitFrame("CompactPartyFrameMember" .. i) then
+            c = c + 1
         end
 
         if i <= 8 then
@@ -292,58 +286,17 @@ function HealerHelper:UpdateHealBarsLayout()
 end
 
 local previousGroupSize = 0
-local searchForNew = false
-local d = 1
-function HealerHelper:CheckForNewFrames(oldc)
-    if searchForNew then return end
-    searchForNew = true
-    if oldc and oldc <= 0 then
-        HealerHelper:UpdateHealBarsLayout()
-    end
-
-    local c = oldc or HealerHelper:UpdateAllowedUnitFrames()
-    if c > 0 or (oldc ~= nil and oldc > 0) then
-        local i = 0
+function HealerHelper:CheckForNewFrames()
+    local c = HealerHelper:UpdateAllowedUnitFrames()
+    if c > 0 then
         for frame, name in pairs(unitFrames) do
             if frame ~= nil and healBars[frame] == nil then
                 healBars[frame] = true
                 HealerHelper:AddIcons(frame)
                 HealerHelper:AddTexts(frame)
                 HealerHelper:AddHealbar(frame)
-                i = i + 1
-                if i >= 5 then break end
             end
         end
-
-        d = d + 1
-        if d > 4 then
-            d = 4
-        end
-
-        C_Timer.After(
-            0.0,
-            function()
-                searchForNew = false
-                if oldc then
-                    HealerHelper:CheckForNewFrames(oldc - i)
-                else
-                    HealerHelper:CheckForNewFrames(c - i)
-                end
-            end
-        )
-    else
-        d = d - 1
-        if d < 1 then
-            d = 1
-        end
-
-        C_Timer.After(
-            d * 1,
-            function()
-                searchForNew = false
-                HealerHelper:CheckForNewFrames()
-            end
-        )
     end
 end
 
@@ -409,7 +362,10 @@ healerHelper:SetScript(
                 local currentGroupSize = GetNumGroupMembers()
                 if currentGroupSize ~= previousGroupSize then
                     previousGroupSize = currentGroupSize
+                    print("CHECK FOR NEW")
                     HealerHelper:CheckForNewFrames()
+                else
+                    print("SAME SIZE")
                 end
 
                 HealerHelper:UpdateRaidTargets()
@@ -454,8 +410,15 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:CheckForNewFrames()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.11"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.12"))
+            C_Timer.After(
+                4,
+                function()
+                    HealerHelper:CheckForNewFrames()
+                    HealerHelper:UpdateRaidTargets()
+                    HealerHelper:UpdateHealBarsLayout()
+                end
+            )
         end
     end
 )
@@ -616,6 +579,21 @@ local function HH_ClearChargeCooldown(frame, cooldownFrame)
     end
 end
 
+local defaultCooldownInfo = {
+    startTime = 0,
+    duration = 0,
+    isEnabled = false,
+    modRate = 0
+}
+
+local defaultChargeInfo = {
+    currentCharges = 0,
+    maxCharges = 0,
+    cooldownStartTime = 0,
+    cooldownDuration = 0,
+    chargeModRate = 0
+}
+
 local function HH_RETAIL_ActionButton_UpdateCooldown(self)
     local locStart, locDuration
     local start, duration, enable, charges, maxCharges, chargeStart, chargeDuration
@@ -654,22 +632,9 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
         enable = 1
     elseif self:GetAttribute("spell") then
         locStart, locDuration = C_Spell.GetSpellLossOfControlCooldown(self:GetAttribute("spell"))
-        local spellCooldownInfo = C_Spell.GetSpellCooldown(self:GetAttribute("spell")) or {
-            startTime = 0,
-            duration = 0,
-            isEnabled = false,
-            modRate = 0
-        }
-
+        local spellCooldownInfo = C_Spell.GetSpellCooldown(self:GetAttribute("spell")) or defaultCooldownInfo
         start, duration, enable, modRate = spellCooldownInfo.startTime, spellCooldownInfo.duration, spellCooldownInfo.isEnabled, spellCooldownInfo.modRate
-        local chargeInfo = HealerHelper:GetSpellCharges(self:GetAttribute("spell")) or {
-            currentCharges = 0,
-            maxCharges = 0,
-            cooldownStartTime = 0,
-            cooldownDuration = 0,
-            chargeModRate = 0
-        }
-
+        local chargeInfo = HealerHelper:GetSpellCharges(self:GetAttribute("spell")) or defaultChargeInfo
         charges, maxCharges, chargeStart, chargeDuration, chargeModRate = chargeInfo.currentCharges, chargeInfo.maxCharges, chargeInfo.cooldownStartTime, chargeInfo.cooldownDuration, chargeInfo.chargeModRate
     end
 
@@ -683,7 +648,6 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
             end
 
             HH_CooldownFrame_Set(self.cooldown, locStart, locDuration, true, true, modRate)
-            self.cooldown:SetScript("OnCooldownDone", ActionButtonCooldown_OnCooldownDone, false)
             HH_ClearChargeCooldown(self, self.chargeCooldown)
         else
             if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_NORMAL then
@@ -693,7 +657,6 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
                 self.cooldown.currentCooldownType = COOLDOWN_TYPE_NORMAL
             end
 
-            self.cooldown:SetScript("OnCooldownDone", ActionButtonCooldown_OnCooldownDone, locStart > 0)
             if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
                 HH_StartChargeCooldown(self, self.chargeCooldown, chargeStart, chargeDuration, chargeModRate)
             else
@@ -811,8 +774,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
         HealerHelper:RegisterEvent(customButtonEvents, "SPELL_UPDATE_CHARGES")
         HealerHelper:RegisterEvent(customButtonEvents, "ACTIONBAR_UPDATE_STATE")
         HealerHelper:RegisterEvent(customButtonEvents, "ACTIONBAR_UPDATE_COOLDOWN")
-        HealerHelper:RegisterEvent(customButtonEvents, "LOSS_OF_CONTROL_UPDATE")
-        HealerHelper:RegisterEvent(customButtonEvents, "LOSS_OF_CONTROL_ADDED")
     end
 
     if customButton.SpellCastAnimFrame then
@@ -940,9 +901,11 @@ function HealerHelper:AddActionButton(frame, bar, i)
     customButtonEvents:SetScript(
         "OnEvent",
         function(sel, event, ...)
+            if not frame:IsShown() or not customButton:IsShown() then return end
+            if frame:GetParent() and not frame:GetParent():IsShown() then return end
             local spellID = select(3, ...)
             if spellID == customButton:GetAttribute("spell") or spellID == nil then
-                if event == "ACTIONBAR_UPDATE_COOLDOWN" or event == "LOSS_OF_CONTROL_ADDED" or event == "LOSS_OF_CONTROL_UPDATE" then
+                if event == "ACTIONBAR_UPDATE_COOLDOWN" then
                     if customButton:GetAttribute("spell") then
                         if HealerHelper:GetWoWBuild() == "RETAIL" then
                             HH_RETAIL_ActionButton_UpdateCooldown(customButton)

@@ -173,8 +173,9 @@ function HealerHelper:FoundDispellable()
     if foundDispellable then return end
     foundDispellable = true
     PlaySound(12889, "Ambience")
+    local delay = IsInRaid() and 2.9 or 1.9
     C_Timer.After(
-        1.9,
+        delay,
         function()
             foundDispellable = false
         end
