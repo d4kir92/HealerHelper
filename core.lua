@@ -206,16 +206,12 @@ local function AddUpdateFramePosition(fra, nr, gro)
                                 frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                                 frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
-                            else
-                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #2", HealerHelper:GetOptionValue("LAYOUT"))
                             end
                         else
                             if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
                                 frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                                 frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
-                            else
-                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #3", HealerHelper:GetOptionValue("LAYOUT"))
                             end
                         end
                     else
@@ -231,8 +227,6 @@ local function AddUpdateFramePosition(fra, nr, gro)
                                 spacingY = HealerHelper:GetOptionValue("GAPY")
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
                                 spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
-                            else
-                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #4", HealerHelper:GetOptionValue("LAYOUT"))
                             end
 
                             frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
@@ -241,8 +235,6 @@ local function AddUpdateFramePosition(fra, nr, gro)
                                 spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
                                 spacingX = HealerHelper:GetOptionValue("GAPX")
-                            else
-                                HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #5", HealerHelper:GetOptionValue("LAYOUT"))
                             end
 
                             frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
@@ -428,7 +420,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.14"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.15"))
             C_Timer.After(
                 1,
                 function()
