@@ -248,9 +248,6 @@ local function AddUpdateFramePosition(fra, nr, gro)
     )
 end
 
-function HealerHelper:UpdatedLayout()
-end
-
 function HealerHelper:UpdateHealBarsLayout()
     if test then return end
     test = true
@@ -289,7 +286,6 @@ function HealerHelper:UpdateHealBarsLayout()
         end
     end
 
-    HealerHelper:UpdatedLayout()
     HealerHelper:UpdateStates()
     test = false
 end
@@ -340,6 +336,9 @@ function HealerHelper:UpdateStates()
         for x, btn in pairs(btns) do
             if not InCombatLockdown() then
                 HealerHelper:UpdateStateBtn(i, btn)
+                if btn:GetParent() and btn:GetParent():GetParent() and btn:GetParent():GetParent() then
+                    btn:UpdateDesign(btn:GetParent():GetParent())
+                end
             end
         end
     end
@@ -420,13 +419,17 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.19"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.20"))
             C_Timer.After(
                 1,
                 function()
-                    HealerHelper:CheckForNewFrames()
-                    HealerHelper:UpdateRaidTargets()
-                    HealerHelper:UpdateHealBarsLayout()
+                    local currentGroupSize = GetNumGroupMembers()
+                    if currentGroupSize ~= previousGroupSize then
+                        previousGroupSize = currentGroupSize
+                        HealerHelper:CheckForNewFrames()
+                        HealerHelper:UpdateRaidTargets()
+                        HealerHelper:UpdateHealBarsLayout()
+                    end
                 end
             )
         end
@@ -1029,7 +1032,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end, {customButton, frame, bar}, "SecureActionButtons", customButton, frame
     )
 
-    local function UpdateDesign(sel)
+    function customButton:UpdateDesign(sel)
         if InCombatLockdown() and bar:IsProtected() then return end
         local ACTIONBUTTONPERROW = HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5)
         local ROWS = HealerHelper:GetOptionValue("ROWS", 2)
@@ -1054,19 +1057,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         end
     end
 
-    UpdateDesign(frame)
-    local updateBool = false
-    hooksecurefunc(
-        HealerHelper,
-        "UpdatedLayout",
-        function()
-            if updateBool then return end
-            updateBool = true
-            UpdateDesign(frame)
-            updateBool = false
-        end
-    )
-
+    customButton:UpdateDesign(frame)
     if HealerHelper:GetOptionValue("spell" .. i) ~= nil then
         HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i), i)
     else
