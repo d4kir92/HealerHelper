@@ -440,7 +440,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.21"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.22"))
             C_Timer.After(
                 2,
                 function()
@@ -1029,7 +1029,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 HealerHelper:MSG("MISSING SetFrameRef")
             end
 
-            handler:SetAttribute("_onstate-unit", [[
+            handler:SetAttribute("_onattributechanged", [[
                 local unitFrame = self:GetFrameRef("unitFrame")
                 if name == "state-unit" then                    
                     local actionButton = self:GetFrameRef("actionButton")
