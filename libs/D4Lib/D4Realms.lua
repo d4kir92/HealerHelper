@@ -3090,6 +3090,10 @@ end
 
 local withoutSpaces = {}
 for name, val in pairs(realms) do
+    if string.find(name, "-", 1, true) ~= nil then
+        withoutSpaces[name:gsub("-", "")] = val
+    end
+
     if string.find(name, " ", 1, true) ~= nil then
         withoutSpaces[name:gsub(" ", "")] = val
     end

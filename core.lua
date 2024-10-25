@@ -148,6 +148,21 @@ local function FindDirection()
     return "FAILED"
 end
 
+local handlers = {}
+function HealerHelper:UpdateFramePosition(frame)
+    local handler = handlers[frame]
+    if handler then
+        local p1, p2, p3, p4, p5 = frame:GetPoint()
+        if p1 and p2 and p3 and p4 and p5 then
+            frame:SetAttribute("hh_p1", p1)
+            handler:SetFrameRef("hh_p2", p2)
+            frame:SetAttribute("hh_p3", p3)
+            frame:SetAttribute("hh_p4", p4)
+            frame:SetAttribute("hh_p5", p5)
+        end
+    end
+end
+
 local test = false
 local currentlyUpdating = {}
 local function AddUpdateFramePosition(fra, nr, gro)
@@ -204,14 +219,18 @@ local function AddUpdateFramePosition(fra, nr, gro)
                         if direction == "DOWN" then
                             if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
                                 frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                                HealerHelper:UpdateFramePosition(frame)
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                                 frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                                HealerHelper:UpdateFramePosition(frame)
                             end
                         else
                             if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
                                 frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
+                                HealerHelper:UpdateFramePosition(frame)
                             elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                                 frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
+                                HealerHelper:UpdateFramePosition(frame)
                             end
                         end
                     else
@@ -230,6 +249,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
                             end
 
                             frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
+                            HealerHelper:UpdateFramePosition(frame)
                         else
                             if (HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT") and direction == "RIGHT" then
                                 spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
@@ -238,6 +258,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
                             end
 
                             frame:SetPoint("LEFT", previousFrame, "RIGHT", spacingX, spacingY)
+                            HealerHelper:UpdateFramePosition(frame)
                         end
                     end
                 end
@@ -419,9 +440,9 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.20"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.21"))
             C_Timer.After(
-                1,
+                2,
                 function()
                     local currentGroupSize = GetNumGroupMembers()
                     if currentGroupSize ~= previousGroupSize then
@@ -1008,16 +1029,16 @@ function HealerHelper:AddActionButton(frame, bar, i)
                 HealerHelper:MSG("MISSING SetFrameRef")
             end
 
-            handler:SetAttribute("_onattributechanged", [[
-                    if name == "state-unit" then                       
-                        local unitFrame = self:GetFrameRef("unitFrame")
-                        local actionButton = self:GetFrameRef("actionButton")
-                        if unitFrame and actionButton then
-                            local unit = unitFrame:GetAttribute("unit")
-                            actionButton:SetAttribute("unit", unit)
-                        end
+            handler:SetAttribute("_onstate-unit", [[
+                local unitFrame = self:GetFrameRef("unitFrame")
+                if name == "state-unit" then                    
+                    local actionButton = self:GetFrameRef("actionButton")
+                    if unitFrame and actionButton then
+                        local unit = unitFrame:GetAttribute("unit")
+                        actionButton:SetAttribute("unit", unit)
                     end
-                ]])
+                end
+            ]])
             RegisterStateDriver(handler, "unit", "[combat] none; [nocombat] party1")
             frame:HookScript(
                 "OnAttributeChanged",
@@ -1224,6 +1245,37 @@ function HealerHelper:AddHealbar(unitFrame)
             bar.t = bar:CreateTexture()
             bar.t:SetColorTexture(1, 0, 0)
             bar.t:SetAllPoints(bar)
+        end
+
+        if not InCombatLockdown() then
+            handlers[unitFrame] = CreateFrame("Frame", nil, nil, "SecureHandlerAttributeTemplate")
+            local handler = handlers[unitFrame]
+            if handler.SetFrameRef then
+                handler:SetFrameRef("unitFrame", unitFrame)
+                handler:SetFrameRef("bar", bar)
+            else
+                HealerHelper:MSG("MISSING SetFrameRef #2")
+            end
+
+            handler:SetAttribute("_onattributechanged", [[
+                local run = control or self
+                local unitFrame = run:GetFrameRef("unitFrame")
+                if unitFrame then
+                    local p1, p2, p3, p4, p5 = unitFrame:GetPoint()
+                    if p1 and p3 then                     
+                        local hh_p1 = unitFrame:GetAttribute("hh_p1")
+                        local hh_p2 = run:GetFrameRef("hh_p2")
+                        local hh_p3 = unitFrame:GetAttribute("hh_p3")
+                        local hh_p4 = unitFrame:GetAttribute("hh_p4")
+                        local hh_p5 = unitFrame:GetAttribute("hh_p5")
+                        if hh_p1 and hh_p3 and (p1 ~= hh_p1 or p3 ~= hh_p3 or p4 ~= hh_p4 or p5 ~= hh_p5) then
+                            unitFrame:ClearAllPoints()
+                            unitFrame:SetPoint(hh_p1, hh_p2, hh_p3, hh_p4, hh_p5)
+                        end
+                    end
+                end
+            ]])
+            RegisterStateDriver(handler, "visibility", "[group] show; hide")
         end
 
         for i = 1, 24 do
