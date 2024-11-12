@@ -7,16 +7,6 @@ local ActionButtonCastType = {
 
 local actionbuttons = {}
 local healBars = {}
-function HealerHelper:RegisterEvent(frame, event, unit)
-    if C_EventUtils.IsEventValid(event) then
-        if unit then
-            frame:RegisterUnitEvent(event, "player")
-        else
-            frame:RegisterEvent(event)
-        end
-    end
-end
-
 local HEAHEL_HIDDEN = CreateFrame("Frame", "HEAHEL_HIDDEN")
 HEAHEL_HIDDEN:Hide()
 function HealerHelper:GetOptionValue(name)
@@ -440,7 +430,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.22"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.23"))
             C_Timer.After(
                 2,
                 function()
