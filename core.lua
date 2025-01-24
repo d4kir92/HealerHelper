@@ -155,9 +155,57 @@ end
 
 local test = false
 local currentlyUpdating = {}
+local oldUnits = {}
 local function AddUpdateFramePosition(fra, nr, gro)
     if currentlyUpdating[fra] then return end
     currentlyUpdating[fra] = true
+    if HealerHelper:GetWoWBuild() == "CLASSIC" then
+        local frameName = _G[fra:GetName() .. "Name"]
+        hooksecurefunc(
+            frameName,
+            "SetPoint",
+            function(sel, ...)
+                if sel.hh_set_point then return end
+                sel.hh_set_point = true
+                sel:ClearAllPoints()
+                sel:SetPoint("TOPLEFT", fra, "TOPLEFT", 3, -3)
+                sel.hh_set_point = false
+            end
+        )
+
+        frameName:SetPoint("TOPLEFT", fra, "TOPLEFT", 3, -3)
+        hooksecurefunc(
+            frameName,
+            "SetText",
+            function(sel, ...)
+                if sel.hh_set_text then return end
+                sel.hh_set_text = true
+                if UnitExists(fra.unit) then
+                    local roleParty = UnitGroupRolesAssigned(fra.unit)
+                    local name = UnitName(fra.unit)
+                    if frameName then
+                        frameName:SetText(format("|A:%s:16:16:0:0|a %s", HealerHelper:GetRoleIcon(roleParty), name))
+                    end
+                end
+
+                sel.hh_set_text = false
+            end
+        )
+
+        function fra:ThinkRole()
+            if oldUnits[fra] ~= fra.unit then
+                oldUnits[fra] = fra.unit
+                if frameName then
+                    frameName:SetText(frameName:GetText())
+                end
+            end
+
+            C_Timer.After(1, fra.ThinkRole)
+        end
+
+        fra:ThinkRole()
+    end
+
     HealerHelper:TryRunSecure(
         function(frame, i, group)
             local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
@@ -430,7 +478,7 @@ healerHelper:SetScript(
             HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
-            HealerHelper:MSG(string.format("LOADED v%s", "0.7.26"))
+            HealerHelper:MSG(string.format("LOADED v%s", "0.7.27"))
             C_Timer.After(
                 2,
                 function()
@@ -1049,17 +1097,15 @@ function HealerHelper:AddActionButton(frame, bar, i)
         local ROWS = HealerHelper:GetOptionValue("ROWS", 2)
         local sw = sel:GetWidth()
         bar:SetWidth(sw)
-        bar:SetHeight(sw / ACTIONBUTTONPERROW * ROWS)
+        bar:SetHeight(frame:GetHeight())
         local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
         local col = (i - 1) % ACTIONBUTTONPERROW
         local xOffset = col * customButton:GetWidth()
         local yOffset = row * -customButton:GetHeight()
         if InCombatLockdown() and customButton:IsProtected() then return end
         if customButton:GetWidth() and customButton:GetWidth() > 0 and ACTIONBUTTONPERROW and ACTIONBUTTONPERROW > 0 then
-            local scale = sw / (customButton:GetWidth() * ACTIONBUTTONPERROW)
-            if scale and scale > 0 then
-                customButton:SetScale(scale)
-            end
+            local scale = frame:GetHeight() / (customButton:GetHeight() * ROWS)
+            customButton:SetScale(scale)
         end
 
         customButton:ClearAllPoints()
