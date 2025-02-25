@@ -1,13 +1,15 @@
 ## Interface: 30403
-## Version: 0.7.31
+## Version: 0.7.32
 ## Title: HealerHelper |T134149:16:16:0:0|t by |cff3FC7EBD4KiR |T132115:16:16:0:0|t 
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Author: D4KiR
+## X-Category: D4KiR
 ## DefaultState: enabled
 ## SavedVariables: HEAHEL
 ## SavedVariablesPerCharacter: HEAHELPC
 ## X-Curse-Project-ID: 1091858
 ## X-Wago-ID: EGPXoWG1
+## IconTexture: 134149
 
 libs\D4Lib\D4Lib.xml
 
