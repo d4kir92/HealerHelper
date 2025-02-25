@@ -10,14 +10,14 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion("HealerHelper", "134149", "0.7.30")
+    HealerHelper:SetVersion("134149", "0.7.31")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
             ["pTab"] = {"CENTER"},
             ["sw"] = 520,
             ["sh"] = 520,
-            ["title"] = format("HealerHelper |T134149:16:16:0:0|t v|cff3FC7EB%s", "0.7.30")
+            ["title"] = format("|T134149:16:16:0:0|t HealerHelper v|cff3FC7EB%s", HealerHelper:GetVersion())
         }
     )
 
@@ -233,9 +233,12 @@ function HealerHelper:InitSettings()
             ["name"] = "HealerHelper",
             ["icon"] = 134149,
             ["dbtab"] = HEAHELPC,
-            ["vTT"] = {{"HealerHelper |T134149:16:16:0:0|t", "v|cff3FC7EB0.7.302"}, {"Leftclick", "Toggle Settings"}},
+            ["vTT"] = {{"|T134149:16:16:0:0|t HealerHelper", "v|cff3FC7EB" .. HealerHelper:GetVersion()}, {HealerHelper:Trans("LID_LEFTCLICK"), HealerHelper:Trans("LID_OPENSETTINGS")}, {HealerHelper:Trans("LID_RIGHTCLICK"), HealerHelper:Trans("LID_HIDEMINIMAPBUTTON")}},
             ["funcL"] = function()
                 HealerHelper:ToggleSettings()
+            end,
+            ["funcR"] = function()
+                HealerHelper:HideMMBtn("HealerHelper")
             end,
             ["dbkey"] = "MMBTN"
         }
