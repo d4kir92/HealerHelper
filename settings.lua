@@ -10,7 +10,7 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion(134149, "0.7.33")
+    HealerHelper:SetVersion(134149, "0.7.34")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
@@ -70,9 +70,9 @@ function HealerHelper:InitSettings()
         "LAYOUT",
         "BOTTOM",
         {
-            ["BOTTOM"] = HealerHelper:Trans("BOTTOM"),
-            ["RIGHT"] = HealerHelper:Trans("RIGHT"),
-            ["LEFT"] = HealerHelper:Trans("LEFT"),
+            ["BOTTOM"] = "BOTTOM",
+            ["RIGHT"] = "RIGHT",
+            ["LEFT"] = "LEFT",
         },
         function()
             HealerHelper:UpdateHealBarsLayout()
@@ -157,9 +157,9 @@ function HealerHelper:InitSettings()
         "RLAYOUT",
         "BOTTOM",
         {
-            ["BOTTOM"] = HealerHelper:Trans("BOTTOM"),
-            ["RIGHT"] = HealerHelper:Trans("RIGHT"),
-            ["LEFT"] = HealerHelper:Trans("LEFT"),
+            ["BOTTOM"] = "BOTTOM",
+            ["RIGHT"] = "RIGHT",
+            ["LEFT"] = "LEFT",
         },
         function()
             HealerHelper:UpdateHealBarsLayout()
