@@ -10,7 +10,7 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion(134149, "0.7.35")
+    HealerHelper:SetVersion(134149, "0.7.36")
     heahel_settings = HealerHelper:CreateFrame(
         {
             ["name"] = "HealerHelper",
@@ -46,6 +46,14 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendCategory("PARTY")
+    HealerHelper:AppendCheckbox(
+        "LEVE",
+        true,
+        function()
+            HealerHelper:UpdateLevels()
+        end
+    )
+
     HealerHelper:AppendCheckbox(
         "FLAG",
         true,
@@ -140,6 +148,7 @@ function HealerHelper:InitSettings()
     )
 
     HealerHelper:AppendCategory("RAID")
+    HealerHelper:AppendCheckbox("RLEVE", true)
     HealerHelper:AppendCheckbox("RFLAG", true)
     HealerHelper:AppendSlider(
         "RFLAGSCALE",

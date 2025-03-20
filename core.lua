@@ -9,9 +9,19 @@ local actionbuttons = {}
 local healBars = {}
 local HEAHEL_HIDDEN = CreateFrame("Frame", "HEAHEL_HIDDEN")
 HEAHEL_HIDDEN:Hide()
-function HealerHelper:GetOptionValue(name)
+function HealerHelper:GetOptionValue(name, defaultVal)
     HEAHELPC = HEAHELPC or {}
-    if IsInRaid() then return HEAHELPC["R" .. name] end
+    if IsInRaid() then
+        if HEAHELPC["R" .. name] == nil then
+            HEAHELPC["R" .. name] = defaultVal
+        end
+
+        return HEAHELPC["R" .. name]
+    end
+
+    if HEAHELPC[name] == nil then
+        HEAHELPC[name] = defaultVal
+    end
 
     return HEAHELPC[name]
 end
@@ -460,22 +470,72 @@ healerHelper:SetScript(
         elseif event == "ADDON_LOADED" then
             if select(1, ...) ~= AddonName then return end
             HEAHELPC = HEAHELPC or {}
-            HEAHELPC["FLAG"] = HEAHELPC["FLAG"] or true
-            HEAHELPC["FLAGSCALE"] = HEAHELPC["FLAGSCALE"] or 1
+            if HEAHELPC["LEVE"] == nil then
+                HEAHELPC["LEVE"] = true
+            end
+
+            if HEAHELPC["FLAG"] == nil then
+                HEAHELPC["FLAG"] = true
+            end
+
+            if HEAHELPC["FLAGSCALE"] == nil then
+                HEAHELPC["FLAGSCALE"] = 1
+            end
+
             HEAHELPC["LAYOUT"] = HEAHELPC["LAYOUT"] or "BOTTOM"
-            HEAHELPC["GAPX"] = HEAHELPC["GAPX"] or 6
-            HEAHELPC["GAPY"] = HEAHELPC["GAPY"] or 6
-            HEAHELPC["OFFSET"] = HEAHELPC["OFFSET"] or 2
-            HEAHELPC["RFLAG"] = HEAHELPC["RFLAG"] or true
-            HEAHELPC["RFLAGSCALE"] = HEAHELPC["RFLAGSCALE"] or 1
+            if HEAHELPC["GAPX"] == nil then
+                HEAHELPC["GAPX"] = 6
+            end
+
+            if HEAHELPC["GAPY"] == nil then
+                HEAHELPC["GAPY"] = 6
+            end
+
+            if HEAHELPC["OFFSET"] == nil then
+                HEAHELPC["OFFSET"] = 2
+            end
+
+            if HEAHELPC["RLEVE"] == nil then
+                HEAHELPC["RLEVE"] = true
+            end
+
+            if HEAHELPC["RFLAG"] == nil then
+                HEAHELPC["RFLAG"] = true
+            end
+
+            if HEAHELPC["RFLAGSCALE"] == nil then
+                HEAHELPC["RFLAGSCALE"] = 1
+            end
+
             HEAHELPC["RLAYOUT"] = HEAHELPC["RLAYOUT"] or "BOTTOM"
-            HEAHELPC["RGAPX"] = HEAHELPC["RGAPX"] or 4
-            HEAHELPC["RGAPY"] = HEAHELPC["RGAPY"] or 4
-            HEAHELPC["ROFFSET"] = HEAHELPC["ROFFSET"] or 0
-            HEAHELPC["ROWS"] = HEAHELPC["ROWS"] or 2
-            HEAHELPC["ACTIONBUTTONPERROW"] = HEAHELPC["ACTIONBUTTONPERROW"] or 5
-            HEAHELPC["RROWS"] = HEAHELPC["RROWS"] or 2
-            HEAHELPC["RACTIONBUTTONPERROW"] = HEAHELPC["RACTIONBUTTONPERROW"] or 5
+            if HEAHELPC["RGAPX"] == nil then
+                HEAHELPC["RGAPX"] = 4
+            end
+
+            if HEAHELPC["RGAPY"] == nil then
+                HEAHELPC["RGAPY"] = 4
+            end
+
+            if HEAHELPC["ROFFSET"] == nil then
+                HEAHELPC["ROFFSET"] = 0
+            end
+
+            if HEAHELPC["ROWS"] == nil then
+                HEAHELPC["ROWS"] = 2
+            end
+
+            if HEAHELPC["ACTIONBUTTONPERROW"] == nil then
+                HEAHELPC["ACTIONBUTTONPERROW"] = 5
+            end
+
+            if HEAHELPC["RROWS"] == nil then
+                HEAHELPC["RROWS"] = 2
+            end
+
+            if HEAHELPC["RACTIONBUTTONPERROW"] == nil then
+                HEAHELPC["RACTIONBUTTONPERROW"] = 5
+            end
+
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             C_Timer.After(
@@ -1456,8 +1516,20 @@ function HealerHelper:AddTextStr(frame, name, func, ts, p1, p2, p3, p4, p5)
     local f1, _, f3 = t:GetFont()
     t:SetFont(f1, ts, f3)
     t:SetPoint(p1, p2, p3, p4, p5)
+    t.frame = frame
     t.func = func
     func(frame, t)
+
+    return t
+end
+
+local levels = {}
+function HealerHelper:UpdateLevels()
+    for i, text in pairs(levels) do
+        if text.func then
+            text.func(text.frame, text)
+        end
+    end
 end
 
 function HealerHelper:AddTexts(frame)
@@ -1466,7 +1538,7 @@ function HealerHelper:AddTexts(frame)
     if name == nil then return end
     local healthBar = _G[name .. "HealthBarBackground"]
     if healthBar then
-        HealerHelper:AddTextStr(
+        local leve = HealerHelper:AddTextStr(
             frame,
             "HH_Level",
             function(parent, text)
@@ -1483,32 +1555,37 @@ function HealerHelper:AddTexts(frame)
                 end
 
                 local level = UnitLevel(parent.unit)
-                if level == nil then
-                    text:SetText("")
+                if HealerHelper:GetOptionValue("LEVE", true) then
+                    if level == nil then
+                        text:SetText("")
 
-                    return
-                end
+                        return
+                    end
 
-                local t = level
-                if UnitEffectiveLevel ~= nil and UnitEffectiveLevel(parent.unit) ~= UnitLevel(parent.unit) then
-                    t = UnitEffectiveLevel(parent.unit) .. " (" .. UnitLevel(parent.unit) .. ")"
-                end
+                    local t = level
+                    if UnitEffectiveLevel ~= nil and UnitEffectiveLevel(parent.unit) ~= UnitLevel(parent.unit) then
+                        t = UnitEffectiveLevel(parent.unit) .. " (" .. UnitLevel(parent.unit) .. ")"
+                    end
 
-                local max = 60
-                if GetMaxLevelForPlayerExpansion then
-                    max = GetMaxLevelForPlayerExpansion()
-                end
+                    local max = 60
+                    if GetMaxLevelForPlayerExpansion then
+                        max = GetMaxLevelForPlayerExpansion()
+                    end
 
-                if level == max and (UnitEffectiveLevel == nil or UnitEffectiveLevel(parent.unit) == level) then
-                    text:SetText("")
+                    if level == max and (UnitEffectiveLevel == nil or UnitEffectiveLevel(parent.unit) == level) then
+                        text:SetText("")
 
-                    return
+                        return
+                    else
+                        text:SetText(t)
+                    end
                 else
-                    text:SetText(t)
+                    text:SetText("")
                 end
             end, 12, "BOTTOM", healthBar, "BOTTOM", 0, 2
         )
 
+        tinsert(levels, leve)
         HealerHelper:AddTextStr(
             frame,
             "HH_Stats",
