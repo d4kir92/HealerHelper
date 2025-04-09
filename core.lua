@@ -376,7 +376,7 @@ end
 
 function HealerHelper:UpdateStateBtn(i, btn)
     if i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2) then
-        if btn:GetParent() ~= btn:GetAttribute("HEAHEL_bar") then
+        if HealerHelper:GetParent(btn) ~= btn:GetAttribute("HEAHEL_bar") then
             btn:SetAttribute("HEAHEL_ignore", false)
             btn:Show()
             btn:SetParent(btn:GetAttribute("HEAHEL_bar"))
@@ -392,7 +392,7 @@ function HealerHelper:UpdateStateBtn(i, btn)
             btn:SetAttribute("HEAHEL_changed", true)
         end
     else
-        if btn:GetParent() ~= HEAHEL_HIDDEN then
+        if HealerHelper:GetParent(btn) ~= HEAHEL_HIDDEN then
             btn:SetAttribute("HEAHEL_ignore", true)
             btn:Hide()
             btn:SetParent(HEAHEL_HIDDEN)
@@ -405,8 +405,9 @@ function HealerHelper:UpdateStates()
         for x, btn in pairs(btns) do
             if not InCombatLockdown() then
                 HealerHelper:UpdateStateBtn(i, btn)
-                if btn:GetParent() and btn:GetParent():GetParent() and btn:GetParent():GetParent() then
-                    btn:UpdateDesign(btn:GetParent():GetParent())
+                local parent = HealerHelper:GetParent(btn)
+                if parent and HealerHelper:GetParent(parent) then
+                    btn:UpdateDesign(HealerHelper:GetParent(parent))
                 end
             end
         end
@@ -1033,7 +1034,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
         "OnEvent",
         function(sel, event, ...)
             if not frame:IsShown() or not customButton:IsShown() then return end
-            if frame:GetParent() and not frame:GetParent():IsShown() then return end
+            if HealerHelper:GetParent(frame) and not HealerHelper:GetParent(frame):IsShown() then return end
             local spellID = select(3, ...)
             if spellID == customButton:GetAttribute("spell") or spellID == nil then
                 if event == "ACTIONBAR_UPDATE_COOLDOWN" then
