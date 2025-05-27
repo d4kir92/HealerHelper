@@ -166,54 +166,59 @@ end
 local test = false
 local currentlyUpdating = {}
 local oldUnits = {}
+local setupFrames = {}
 local function AddUpdateFramePosition(fra, nr, gro)
     if currentlyUpdating[fra] then return end
     currentlyUpdating[fra] = true
     if HealerHelper:GetWoWBuild() == "CLASSIC" then
         local frameName = _G[fra:GetName() .. "Name"]
-        hooksecurefunc(
-            frameName,
-            "SetPoint",
-            function(sel, ...)
-                if sel.hh_set_point then return end
-                sel.hh_set_point = true
-                sel:ClearAllPoints()
-                sel:SetPoint("TOPLEFT", fra, "TOPLEFT", 3, -3)
-                sel.hh_set_point = false
-            end
-        )
+        if setupFrames[frameName] == nil then
+            setupFrames[frameName] = true
+            hooksecurefunc(
+                frameName,
+                "SetPoint",
+                function(sel, ...)
+                    if sel.hh_set_point then return end
+                    sel.hh_set_point = true
+                    sel:ClearAllPoints()
+                    sel:SetPoint("TOPLEFT", fra, "TOPLEFT", 3, -3)
+                    sel.hh_set_point = false
+                end
+            )
 
-        frameName:SetPoint("TOPLEFT", fra, "TOPLEFT", 3, -3)
-        hooksecurefunc(
-            frameName,
-            "SetText",
-            function(sel, ...)
-                if sel.hh_set_text then return end
-                sel.hh_set_text = true
-                if UnitExists(fra.unit) then
-                    local roleParty = UnitGroupRolesAssigned(fra.unit)
-                    local name = UnitName(fra.unit)
+            hooksecurefunc(
+                frameName,
+                "SetText",
+                function(sel, ...)
+                    if sel.hh_set_text then return end
+                    sel.hh_set_text = true
+                    if UnitExists(fra.unit) then
+                        local roleParty = UnitGroupRolesAssigned(fra.unit)
+                        local name = UnitName(fra.unit)
+                        if frameName then
+                            frameName:SetText(format("|A:%s:16:16:0:0|a %s", HealerHelper:GetRoleIcon(roleParty), name))
+                        end
+                    end
+
+                    sel.hh_set_text = false
+                end
+            )
+
+            function fra:ThinkRole()
+                if oldUnits[fra] ~= fra.unit then
+                    oldUnits[fra] = fra.unit
                     if frameName then
-                        frameName:SetText(format("|A:%s:16:16:0:0|a %s", HealerHelper:GetRoleIcon(roleParty), name))
+                        frameName:SetText(frameName:GetText())
                     end
                 end
 
-                sel.hh_set_text = false
-            end
-        )
-
-        function fra:ThinkRole()
-            if oldUnits[fra] ~= fra.unit then
-                oldUnits[fra] = fra.unit
-                if frameName then
-                    frameName:SetText(frameName:GetText())
-                end
+                C_Timer.After(1, fra.ThinkRole)
             end
 
-            C_Timer.After(1, fra.ThinkRole)
+            fra:ThinkRole()
         end
 
-        fra:ThinkRole()
+        frameName:SetPoint("TOPLEFT", fra, "TOPLEFT", 3, -3)
     end
 
     HealerHelper:TryRunSecure(
@@ -324,7 +329,7 @@ function HealerHelper:UpdateHealBarsLayout()
         local max = MAX_RAID_MEMBERS or 40
         for i = 1, max do
             local frame = _G["CompactRaidFrame" .. i]
-            if frame then
+            if frame and currentlyUpdating[frame] == nil then
                 AddUpdateFramePosition(frame, i)
             else
                 local group = math.ceil(i / 5)
@@ -334,7 +339,7 @@ function HealerHelper:UpdateHealBarsLayout()
                 end
 
                 local frame2 = _G["CompactRaidGroup" .. group .. "Member" .. member]
-                if frame2 then
+                if frame2 and currentlyUpdating[frame2] == nil then
                     AddUpdateFramePosition(frame2, member, group)
                 end
             end
@@ -348,7 +353,9 @@ function HealerHelper:UpdateHealBarsLayout()
             end
 
             if frame then
-                AddUpdateFramePosition(frame, i)
+                if currentlyUpdating[frame] == nil then
+                    AddUpdateFramePosition(frame, i)
+                end
             else
                 break
             end
