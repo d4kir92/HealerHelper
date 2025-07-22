@@ -1,5 +1,5 @@
 ## Interface: 40401, 40402
-## Version: 0.7.42
+## Version: 0.7.43
 ## Title: H|cff3FC7EBealer|rH|cff3FC7EBelper|r |T134149:16:16:0:0|t by |cff3FC7EBD4KiR |T132115:16:16:0:0|t
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Author: D|cff3FC7EB4KiR |T132115:16:16:0:0|t
