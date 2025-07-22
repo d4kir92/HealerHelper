@@ -544,6 +544,7 @@ healerHelper:SetScript(
                 HEAHELPC["RACTIONBUTTONPERROW"] = 5
             end
 
+            HealerHelper:LoadRealms()
             HealerHelper:SetAddonOutput("HealerHelper", "134149")
             HealerHelper:InitSettings()
             C_Timer.After(
@@ -1389,6 +1390,7 @@ end
 
 function HealerHelper:AddIcon(frame, name, atlas, texture, p1, p2, p3, p4, p5, func)
     frame[name] = frame:CreateTexture(frame:GetName() .. "." .. name)
+    frame[name]:SetDrawLayer("OVERLAY", 7)
     local icon = frame[name]
     if atlas then
         icon:SetAtlas(atlas)
@@ -1490,7 +1492,7 @@ function HealerHelper:AddIcons(frame)
             icon:SetSize(64, 32)
             icon:SetScale(0.34 * HealerHelper:GetOptionValue("FLAGSCALE", 1))
             if not UnitIsPlayer(parent.unit) then
-                icon:SetTexture("Interface\\Addons\\HealerHelper\\media\\" .. "bot")
+                icon:SetTexture("Interface\\AddOns\\HealerHelper\\media\\" .. "bot")
 
                 return
             end
@@ -1507,7 +1509,7 @@ function HealerHelper:AddIcons(frame)
             end
 
             if lang then
-                icon:SetTexture("Interface\\Addons\\HealerHelper\\media\\" .. lang)
+                icon:SetTexture("Interface\\AddOns\\HealerHelper\\media\\" .. lang)
             else
                 icon:SetTexture(nil)
             end
