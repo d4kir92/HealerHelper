@@ -23,6 +23,7 @@ libs\D4Lib\D4Lib.xml
 
 locale\enUS.lua
 locale\deDE.lua
+locale\ruRU.lua
 
 buttonretail.xml
 settings.lua
