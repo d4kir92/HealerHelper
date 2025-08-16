@@ -36,7 +36,9 @@ if HealerHelper:GetWoWBuild() == "RETAIL" then
     }
 
     dispells["SHAMAN"] = {
-        [51886] = {"Curse"}
+        [51886] = {"Curse"},
+        [254420] = {"Magic", "Curse"},
+        [210263] = {"Magic", "Curse"},
     }
 
     dispells["WARRIOR"] = {}
