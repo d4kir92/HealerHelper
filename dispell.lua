@@ -39,6 +39,7 @@ if HealerHelper:GetWoWBuild() == "RETAIL" then
         [51886] = {"Curse"},
         [254420] = {"Magic", "Curse"},
         [210263] = {"Magic", "Curse"},
+        [77130] = {"Magic", "Curse"},
     }
 
     dispells["WARRIOR"] = {}
