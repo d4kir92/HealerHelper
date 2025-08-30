@@ -84,20 +84,40 @@ function HealerHelper:AddDispellBorder(frame)
     DebuffBorder:SetSize(150, 150)
     DebuffBorder:SetPoint("CENTER")
     local ProcLoopFlipbook = DebuffBorder:CreateTexture(nil, "ARTWORK")
-    ProcLoopFlipbook:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+    if HealerHelper:AtlasExists("UI-HUD-ActionBar-Proc-Loop-Flipbook") and ProcLoopFlipbook.SetAtlas then
+        ProcLoopFlipbook:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+    else
+        ProcLoopFlipbook:SetTexture("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+    end
+
     ProcLoopFlipbook:SetAllPoints()
     ProcLoopFlipbook:SetAlpha(0)
     local ProcLoop = ProcLoopFlipbook:CreateAnimationGroup()
     ProcLoop:SetLooping("REPEAT")
     local ProcLoopAlpha = ProcLoop:CreateAnimation("Alpha")
     ProcLoopAlpha:SetDuration(0.001)
-    ProcLoopAlpha:SetFromAlpha(1)
-    ProcLoopAlpha:SetToAlpha(1)
+    if ProcLoopAlpha.SetFromAlpha then
+        ProcLoopAlpha:SetFromAlpha(1)
+    end
+
+    if ProcLoopAlpha.SetToAlpha then
+        ProcLoopAlpha:SetToAlpha(1)
+    end
+
     local ProcLoopFlipAnim = ProcLoop:CreateAnimation("FlipBook")
     ProcLoopFlipAnim:SetDuration(1)
-    ProcLoopFlipAnim:SetFlipBookRows(6)
-    ProcLoopFlipAnim:SetFlipBookColumns(5)
-    ProcLoopFlipAnim:SetFlipBookFrames(30)
+    if ProcLoopFlipAnim.SetFlipBookRows then
+        ProcLoopFlipAnim:SetFlipBookRows(6)
+    end
+
+    if ProcLoopFlipAnim.SetFlipBookColumns then
+        ProcLoopFlipAnim:SetFlipBookColumns(5)
+    end
+
+    if ProcLoopFlipAnim.SetFlipBookFrames then
+        ProcLoopFlipAnim:SetFlipBookFrames(30)
+    end
+
     ProcLoop:Play()
     local sw, sh = frame:GetSize()
     hooksecurefunc(
@@ -117,8 +137,13 @@ function HealerHelper:AddDispellBorder(frame)
                 DebuffBorder:Show()
                 local r, g, b, a = unpack(debuffcolor)
                 ProcLoopFlipbook:SetVertexColor(r, g, b, a)
-                ProcLoopAlpha:SetFromAlpha(a)
-                ProcLoopAlpha:SetToAlpha(a)
+                if ProcLoopAlpha.SetFromAlpha then
+                    ProcLoopAlpha:SetFromAlpha(a)
+                end
+
+                if ProcLoopAlpha.SetToAlpha then
+                    ProcLoopAlpha:SetToAlpha(a)
+                end
             else
                 DebuffBorder:Hide()
             end

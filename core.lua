@@ -847,14 +847,26 @@ function HealerHelper:SetupGlow(button)
         glow:SetHeight(button:GetHeight() * 1.7)
         local animationGroup = glow:CreateAnimationGroup()
         local fadeOut = animationGroup:CreateAnimation("Alpha")
-        fadeOut:SetFromAlpha(1)
-        fadeOut:SetToAlpha(0.5)
+        if fadeOut.SetFromAlpha then
+            fadeOut:SetFromAlpha(1)
+        end
+
+        if fadeOut.SetToAlpha then
+            fadeOut:SetToAlpha(0.5)
+        end
+
         fadeOut:SetDuration(0.6)
         fadeOut:SetSmoothing("IN_OUT")
         fadeOut:SetOrder(1)
         local fadeIn = animationGroup:CreateAnimation("Alpha")
-        fadeIn:SetFromAlpha(0.5)
-        fadeIn:SetToAlpha(1)
+        if fadeIn.SetFromAlpha then
+            fadeIn:SetFromAlpha(0.5)
+        end
+
+        if fadeIn.SetToAlpha then
+            fadeIn:SetToAlpha(1)
+        end
+
         fadeIn:SetDuration(0.6)
         fadeIn:SetSmoothing("IN_OUT")
         fadeIn:SetOrder(2)
@@ -1225,56 +1237,56 @@ function HealerHelper:AddActionButton(frame, bar, i)
 
     local textureScale = 0.048
     if HealerHelper:GetWoWBuild() ~= "RETAIL" then
-        if customButton.NormalTexture then
+        if customButton.NormalTexture and customButton.NormalTexture.SetScale then
             customButton.NormalTexture:SetScale(textureScale)
         end
 
-        if customButton.HighlightTexture then
+        if customButton.HighlightTexture and customButton.HighlightTexture.SetScale then
             customButton.HighlightTexture:SetScale(textureScale)
         end
 
-        if customButton.CheckedTexture then
+        if customButton.CheckedTexture and customButton.CheckedTexture.SetScale then
             customButton.CheckedTexture:SetScale(textureScale)
         end
 
-        if customButton.PushedTexture then
+        if customButton.PushedTexture and customButton.PushedTexture.SetScale then
             customButton.PushedTexture:SetScale(textureScale)
         end
 
-        if customButton.SpellCastAnimFrame then
+        if customButton.SpellCastAnimFrame and customButton.SpellCastAnimFrame.SetScale then
             customButton.SpellCastAnimFrame:SetScale(textureScale - 0.002)
         end
 
-        if customButton.InterruptDisplay then
+        if customButton.InterruptDisplay and customButton.InterruptDisplay.SetScale then
             customButton.InterruptDisplay:SetScale(textureScale - 0.002)
         end
 
-        if customButton.InterruptDisplay then
+        if customButton.InterruptDisplay and customButton.InterruptDisplay.SetScale then
             customButton.InterruptDisplay:SetScale(textureScale)
         end
 
-        if customButton.SlotArt then
+        if customButton.SlotArt and customButton.SlotArt.SetScale then
             customButton.SlotArt:SetScale(textureScale)
         end
 
-        if customButton.SlotBackground then
+        if customButton.SlotBackground and customButton.SlotBackground.SetScale then
             customButton.SlotBackground:SetScale(textureScale)
         end
 
-        if customButton.Name then
+        if customButton.Name and customButton.Name.SetScale then
             customButton.Name:SetScale(textureScale)
         end
 
-        if customButton.IconMask then
+        if customButton.IconMask and customButton.IconMask.SetScale then
             customButton.IconMask:SetScale(textureScale)
         end
 
-        if customButton.TargetReticleAnimFrame then
+        if customButton.TargetReticleAnimFrame and customButton.TargetReticleAnimFrame.SetScale then
             customButton.TargetReticleAnimFrame:SetScale(textureScale)
         end
 
         local cooldown = _G[customButton:GetName() .. "Cooldown"]
-        if cooldown then
+        if cooldown and cooldown.SetScale then
             cooldown:SetScale(textureScale)
         end
 
@@ -1283,7 +1295,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
             customButton.SpellActivationAlert.ProcStartFlipbook:SetScale(textureScale)
         end
 
-        if Counts[customButton] then
+        if Counts[customButton] and Counts[customButton].SetScale then
             Counts[customButton]:SetScale(0.06)
             HealerHelper:TryRunSecure(
                 function(btn)
@@ -1392,7 +1404,7 @@ function HealerHelper:AddIcon(frame, name, atlas, texture, p1, p2, p3, p4, p5, f
     frame[name] = frame:CreateTexture(frame:GetName() .. "." .. name)
     frame[name]:SetDrawLayer("OVERLAY", 7)
     local icon = frame[name]
-    if atlas then
+    if HealerHelper:AtlasExists(atlas) and icon.SetAtlas then
         icon:SetAtlas(atlas)
     elseif texture then
         icon:SetTexture(texture)
@@ -1432,7 +1444,7 @@ function HealerHelper:AddIcons(frame)
         -5,
         function(parent, icon)
             if parent.unit == nil then return end
-            if UnitIsGroupLeader(parent.unit) then
+            if UnitIsGroupLeader and UnitIsGroupLeader(parent.unit) then
                 icon:SetAlpha(1)
             else
                 icon:SetAlpha(0)
@@ -1490,7 +1502,10 @@ function HealerHelper:AddIcons(frame)
             end
 
             icon:SetSize(64, 32)
-            icon:SetScale(0.34 * HealerHelper:GetOptionValue("FLAGSCALE", 1))
+            if icon.SetScale then
+                icon:SetScale(0.34 * HealerHelper:GetOptionValue("FLAGSCALE", 1))
+            end
+
             if not UnitIsPlayer(parent.unit) then
                 icon:SetTexture("Interface\\AddOns\\HealerHelper\\media\\" .. "bot")
 
