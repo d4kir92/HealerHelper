@@ -10,7 +10,7 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion(134149, "0.7.54")
+    HealerHelper:SetVersion(134149, "0.7.55")
     heahel_settings = HealerHelper:CreateWindow(
         {
             ["name"] = "HealerHelper",
