@@ -1,11 +1,11 @@
 ## Interface-Classic: 11508
-## Interface-BCC: 20504
+## Interface-BCC: 20505
 ## Interface-Wrath: 30300, 30403
 ## Interface-Cata: 40402
 ## Interface-Mists: 50503
 ## Interface: 110207, 120000
 
-## Version: 0.7.56
+## Version: 0.7.57
 ## Title: H|cff3FC7EBealer|rH|cff3FC7EBelper|r |T134149:16:16:0:0|t by |cff3FC7EBD4KiR |T132115:16:16:0:0|t
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Notes-deDE: Aktionsleiste zu Party-/Raid-Frames hinzufügen
