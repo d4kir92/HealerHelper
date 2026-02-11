@@ -232,20 +232,23 @@ function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
 end
 
 local seismischesSchmettern = true
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-local function OnEvent(self, event)
-    local _, subEvent, _, _, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
-    if spellID == spellSeismischesSchmettern then
-        if subEvent == "SPELL_CAST_START" then
-            seismischesSchmettern = true
-        elseif subEvent == "SPELL_CAST_SUCCESS" then
-            seismischesSchmettern = false
-        end
-    end
-end
-
-frame:SetScript("OnEvent", OnEvent)
 function HealerHelper:IsBossCastingSpell(spellID)
     if spellID == spellSeismischesSchmettern then return seismischesSchmettern end
+end
+
+if HealerHelper:GetWoWBuildNr() < 120000 then
+    local frame = CreateFrame("Frame")
+    HealerHelper:RegisterEvent(frame, "COMBAT_LOG_EVENT_UNFILTERED")
+    local function OnEvent(self, event)
+        local _, subEvent, _, _, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
+        if spellID == spellSeismischesSchmettern then
+            if subEvent == "SPELL_CAST_START" then
+                seismischesSchmettern = true
+            elseif subEvent == "SPELL_CAST_SUCCESS" then
+                seismischesSchmettern = false
+            end
+        end
+    end
+
+    frame:SetScript("OnEvent", OnEvent)
 end
