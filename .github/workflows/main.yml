@@ -31,17 +31,17 @@ jobs:
     steps:
 
       - name: Clone project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # gets git history for changelogs
 
       #- name: Package and release (ONE-ZIP)
       #  uses: BigWigsMods/packager@master
 
-      - name: Package and release for Retail
-        uses: BigWigsMods/packager@master
-        with:
-          args: -g retail -w 0
+      #- name: Package and release for Retail
+      #  uses: BigWigsMods/packager@master
+      #  with:
+      #    args: -g retail -w 0
 
       - name: Package and release for Mists Classic
         uses: BigWigsMods/packager@master
