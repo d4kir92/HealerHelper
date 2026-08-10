@@ -1,9 +1,17 @@
 ## Interface: 20506
-## Version: 0.7.65
+## Version: 0.7.66
 ## Title: HealerHelper |T134149:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Notes-deDE: Aktionsleiste zu Party-/Raid-Frames hinzufügen
+## Notes-esES: Añade una barra de acción a los marcos de grupo/banda
+## Notes-esMX: Añade una barra de acción a los marcos de grupo/banda
+## Notes-frFR: Ajoute une barre d'action aux cadres de groupe/raid
+## Notes-itIT: Aggiunge una barra azione alle cornici di gruppo/raid
+## Notes-koKR: 파티/공격대 프레임에 액션바를 추가합니다
+## Notes-ptBR: Adiciona uma barra de ação aos quadros de grupo/raide
 ## Notes-ruRU: Добавляет панель действий во фреймы группы и рейда
+## Notes-zhCN: 为队伍/团队框架添加动作条
+## Notes-zhTW: 為隊伍/團隊框架新增動作條
 ## Author: D4KiR |T132115:16:16:0:0|t
 ## Category: Unit Frames
 ## Category-deDE: Einheitenfenster

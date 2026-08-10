@@ -10,7 +10,7 @@ function HealerHelper:ToggleSettings()
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion(134149, "0.7.65")
+    HealerHelper:SetVersion(134149, "0.7.66")
     heahel_settings = HealerHelper:CreateWindow({
         ["name"] = "HealerHelper",
         ["pTab"] = {"CENTER"},
