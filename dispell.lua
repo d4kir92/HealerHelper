@@ -96,38 +96,16 @@ function HealerHelper:AddDispellBorder(frame)
     ProcLoop:SetLooping("REPEAT")
     local ProcLoopAlpha = ProcLoop:CreateAnimation("Alpha")
     ProcLoopAlpha:SetDuration(0.001)
-    if ProcLoopAlpha.SetFromAlpha then
-        ProcLoopAlpha:SetFromAlpha(1)
-    end
-
-    if ProcLoopAlpha.SetToAlpha then
-        ProcLoopAlpha:SetToAlpha(1)
-    end
-
+    if ProcLoopAlpha.SetFromAlpha then ProcLoopAlpha:SetFromAlpha(1) end
+    if ProcLoopAlpha.SetToAlpha then ProcLoopAlpha:SetToAlpha(1) end
     local ProcLoopFlipAnim = ProcLoop:CreateAnimation("FlipBook")
     ProcLoopFlipAnim:SetDuration(1)
-    if ProcLoopFlipAnim.SetFlipBookRows then
-        ProcLoopFlipAnim:SetFlipBookRows(6)
-    end
-
-    if ProcLoopFlipAnim.SetFlipBookColumns then
-        ProcLoopFlipAnim:SetFlipBookColumns(5)
-    end
-
-    if ProcLoopFlipAnim.SetFlipBookFrames then
-        ProcLoopFlipAnim:SetFlipBookFrames(30)
-    end
-
+    if ProcLoopFlipAnim.SetFlipBookRows then ProcLoopFlipAnim:SetFlipBookRows(6) end
+    if ProcLoopFlipAnim.SetFlipBookColumns then ProcLoopFlipAnim:SetFlipBookColumns(5) end
+    if ProcLoopFlipAnim.SetFlipBookFrames then ProcLoopFlipAnim:SetFlipBookFrames(30) end
     ProcLoop:Play()
     local sw, sh = frame:GetSize()
-    hooksecurefunc(
-        frame,
-        "SetSize",
-        function(sel, w, h)
-            DebuffBorder:SetSize(w * 1.56, h * 1.58)
-        end
-    )
-
+    hooksecurefunc(frame, "SetSize", function(sel, w, h) DebuffBorder:SetSize(w * 1.56, h * 1.58) end)
     DebuffBorder:SetSize(sw * 1.56, sh * 1.58)
     DebuffBorder:Hide()
     local function OnDebuffDispellable()
@@ -137,29 +115,18 @@ function HealerHelper:AddDispellBorder(frame)
                 DebuffBorder:Show()
                 local r, g, b, a = unpack(debuffcolor)
                 ProcLoopFlipbook:SetVertexColor(r, g, b, a)
-                if ProcLoopAlpha.SetFromAlpha then
-                    ProcLoopAlpha:SetFromAlpha(a)
-                end
-
-                if ProcLoopAlpha.SetToAlpha then
-                    ProcLoopAlpha:SetToAlpha(a)
-                end
+                if ProcLoopAlpha.SetFromAlpha then ProcLoopAlpha:SetFromAlpha(a) end
+                if ProcLoopAlpha.SetToAlpha then ProcLoopAlpha:SetToAlpha(a) end
             else
                 DebuffBorder:Hide()
             end
         end
 
         local delay = IsInRaid() and 0.25 or 0.01
-        C_Timer.After(
-            delay,
-            function()
-                OnDebuffDispellable()
-            end
-        )
+        C_Timer.After(delay, function() OnDebuffDispellable() end)
     end
 
     OnDebuffDispellable()
-
     return DebuffBorder
 end
 
@@ -174,7 +141,6 @@ function HealerHelper:CanDispell(debuffType, spellID)
             end
         end
     end
-
     return false
 end
 
@@ -202,32 +168,20 @@ function HealerHelper:FoundDispellable()
     foundDispellable = true
     PlaySound(12889, "Ambience")
     local delay = IsInRaid() and 2.9 or 1.9
-    C_Timer.After(
-        delay,
-        function()
-            foundDispellable = false
-        end
-    )
+    C_Timer.After(delay, function() foundDispellable = false end)
 end
 
 function HealerHelper:GetDebuffTypeColor(debuffType, spellID)
     if spellID == 440313 then
         local _, className = UnitClass("player")
-        if affixClasses[className] then
-            HealerHelper:FoundDispellable()
-        end
-
+        if affixClasses[className] then HealerHelper:FoundDispellable() end
         return {0, 0, 0, 0.75}
     end
 
     if debuffType then
-        if HealerHelper:CanDispell(debuffType, spellID) then
-            HealerHelper:FoundDispellable()
-        end
-
+        if HealerHelper:CanDispell(debuffType, spellID) then HealerHelper:FoundDispellable() end
         return debuffTypeColors[debuffType]
     end
-
     return {1, 1, 0, 1}
 end
 
