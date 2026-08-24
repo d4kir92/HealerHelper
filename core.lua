@@ -63,14 +63,14 @@ local callbacks = {}
 local runAfterCombat = CreateFrame("Frame")
 HealerHelper:RegisterEvent(runAfterCombat, "PLAYER_REGEN_ENABLED")
 runAfterCombat:SetScript("OnEvent", function(sel, event)
-    if event == "" then
-        for from, tab in pairs(callbacks) do
+    if event == "PLAYER_REGEN_ENABLED" then
+        local pending = callbacks
+        callbacks = {}
+        for from, tab in pairs(pending) do
             local callback = tab.callback
             local args = tab.args
             callback(unpack(args))
         end
-
-        callbacks = {}
     end
 end)
 
@@ -89,9 +89,9 @@ function HealerHelper:TryRunSecure(callback, frames, from, ...)
     if InCombatLockdown() then
         for i, frame in pairs(frames) do
             if frame:IsProtected() then
-                callbacks[from] = {
+                callbacks[from .. tostring(frames[1] or from)] = {
                     callback = callback,
-                    args = {...}
+                    args = args
                 }
                 return
             end
@@ -719,6 +719,8 @@ function HealerHelper:AddActionButton(frame, bar, i)
     if name == nil then return end
     local customButton = CreateFrame("CheckButton", name .. "_BTN_" .. i, bar, "HealerHelperActionButtonTemplate")
     customButton:UnregisterAllEvents()
+    if customButton.Arrow and customButton.UpdateArrowShown then customButton:UpdateArrowShown() end
+    if customButton.BorderShadow and customButton.UpdateBorderShadow then customButton:UpdateBorderShadow() end
     if Counts[customButton] == nil then
         Counts[customButton] = customButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         Counts[customButton]:SetPoint("BOTTOMRIGHT", customButton, "BOTTOMRIGHT", -4, 4)
@@ -913,36 +915,14 @@ function HealerHelper:AddActionButton(frame, bar, i)
     end
 
     HealerHelper:TryRunSecure(function(btn, parent)
-        local handler = CreateFrame("Frame", nil, nil, "SecureHandlerAttributeTemplate")
         btn:SetAttribute("ACTIONBUTTONPERROW", HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5))
         btn:SetAttribute("ROWS", HealerHelper:GetOptionValue("ROWS", 2))
         btn:SetAttribute("HEAHEL_bar", bar)
         btn:SetAttribute("i", i)
-        if handler.SetFrameRef then
-            handler:SetFrameRef("actionButton", btn)
-            handler:SetFrameRef("unitFrame", parent)
-            handler:SetFrameRef("bar", bar)
-            handler:SetFrameRef("HEAHEL_HIDDEN", parent)
-        else
-            HealerHelper:MSG("MISSING SetFrameRef")
-        end
-
-        handler:SetAttribute("_onattributechanged", [[
-                local unitFrame = self:GetFrameRef("unitFrame")
-                if name == "state-unit" then                    
-                    local actionButton = self:GetFrameRef("actionButton")
-                    if unitFrame and actionButton then
-                        local unit = unitFrame:GetAttribute("unit")
-                        actionButton:SetAttribute("unit", unit)
-                    end
-                end
-            ]])
-        RegisterStateDriver(handler, "unit", "[combat] none; [nocombat] party1")
-        frame:HookScript("OnAttributeChanged", function(sel, nam, valu)
-            if sel == nil then return end
-            if InCombatLockdown() and sel:IsProtected() then return false end
-            if nam == "unit" then customButton:SetAttribute("unit", valu) end
-        end)
+        btn:SetAttribute("unit", nil)
+        btn:SetAttribute("useparent-unit", true)
+        bar:SetAttribute("unit", nil)
+        bar:SetAttribute("useparent-unit", true)
     end, {customButton, frame, bar}, "SecureActionButtons", customButton, frame)
 
     function customButton:UpdateDesign(sel)
