@@ -4,7 +4,7 @@
 ## Interface-Cata: 40402
 ## Interface-Mists: 50504
 
-## Version: 0.7.68
+## Version: 0.8.0
 ## Title: HealerHelper by |cff55d2ffD4KiR |T132115:16:16:0:0|t
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Notes-deDE: Aktionsleiste zu Party-/Raid-Frames hinzufügen

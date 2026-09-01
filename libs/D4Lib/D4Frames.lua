@@ -324,7 +324,7 @@ function D4:CreateSlider(tab)
     D4:SetFontSize(slider.High, 10, "THINOUTLINE")
     D4:SetFontSize(slider.Text, 10, "THINOUTLINE")
     slider:SetMinMaxValues(tab.vmin, tab.vmax)
-    if slider.SetObeyStepOnDra then slider:SetObeyStepOnDrag(true) end
+    if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
     slider:SetValueStep(tab.steps)
     if tab.value then slider:SetValue(tab.value) end
     slider:SetScript("OnValueChanged", function(sel, val)
