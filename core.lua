@@ -805,10 +805,10 @@ local function HandleButtonEvent(customButton, event, ...)
             end
         elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
             spellID = select(1, ...)
-            if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_ShowOverlayGlow then HealerHelper:Glow(customButton) end
+            if spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920) then HealerHelper:Glow(customButton) end
         elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
             spellID = select(1, ...)
-            if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_HideOverlayGlow then HealerHelper:Unglow(customButton) end
+            if spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920) then HealerHelper:Unglow(customButton) end
         elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
             customButton:PlaySpellInterruptedAnim()
         elseif event == "UNIT_SPELLCAST_START" then
