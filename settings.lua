@@ -98,7 +98,7 @@ local function AddDropdown(key, value, choices, func)
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion(134149, "0.8.1")
+    HealerHelper:SetVersion(134149, "0.8.2")
     HEAHELPC = HEAHELPC or {}
     heahel_settings = HealerHelper:CreateUIWindow({
         ["name"] = "HealerHelperSettings",
