@@ -568,8 +568,66 @@ function HealerHelper:GetDispellableDebuffsCount(unit)
     return dispellableCount, debuffColor
 end
 
+local function HH_RawGreater(a, b)
+    return a > b
+end
+
+local function HH_Greater(a, b)
+    if a == nil or b == nil then return nil end
+    local ok, res = pcall(HH_RawGreater, a, b)
+    if not ok then return nil end
+
+    return res
+end
+
+local function HH_RawSumGreater(a, b, c, d)
+    return (a + b) > (c + d)
+end
+
+local function HH_SumGreater(a, b, c, d)
+    if a == nil or b == nil or c == nil or d == nil then return nil end
+    local ok, res = pcall(HH_RawSumGreater, a, b, c, d)
+    if not ok then return nil end
+
+    return res
+end
+
+local function HH_RawTruth(value)
+    if value then return true end
+
+    return false
+end
+
+local function HH_Truth(value)
+    local ok, res = pcall(HH_RawTruth, value)
+    if not ok then return nil end
+
+    return res
+end
+
+local function HH_SetText(text, value)
+    if not pcall(text.SetText, text, value) then text:SetText("") end
+end
+
+local function HH_RawSetRaidTargetTexture(icon, index)
+    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. index)
+end
+
+local function HH_RawCooldownActive(enable, duration)
+    return (enable and enable ~= 0 and duration > 0) == true
+end
+
+local function HH_CooldownActive(enable, duration)
+    if enable == nil or duration == nil then return false end
+    local ok, res = pcall(HH_RawCooldownActive, enable, duration)
+    if not ok then return nil end
+
+    return res
+end
+
 local function HH_CooldownFrame_Set(cooldownFrame, start, duration, enable, showCooldownFrame)
-    if enable and enable ~= 0 and duration > 0 then
+    local active = HH_CooldownActive(enable, duration)
+    if active == nil or active == true then
         cooldownFrame:SetCooldown(start, duration)
         if showCooldownFrame then cooldownFrame:Show() end
     else
@@ -582,6 +640,7 @@ local function HH_CreateChargeCooldownFrame(parent)
     chargeCooldowns[parent] = CreateFrame("Cooldown", nil, parent, "CooldownFrameTemplate")
     chargeCooldowns[parent]:SetHideCountdownNumbers(true)
     chargeCooldowns[parent]:SetDrawSwipe(false)
+    chargeCooldowns[parent]:SetDrawEdge(true)
     local icon = parent.Icon or parent.icon
     chargeCooldowns[parent]:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
     chargeCooldowns[parent]:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
@@ -589,17 +648,13 @@ local function HH_CreateChargeCooldownFrame(parent)
     return chargeCooldowns[parent]
 end
 
-local function HH_StartChargeCooldown(frame, start, duration, chargeStart, chargeDuration, chargeMax, charges)
+local function HH_StartChargeCooldown(frame, chargeStart, chargeDuration, chargeModRate, charges)
     chargeCooldowns[frame] = chargeCooldowns[frame] or HH_CreateChargeCooldownFrame(frame)
-    if charges and charges < chargeMax then
-        chargeCooldowns[frame]:SetCooldown(chargeStart, chargeDuration)
-        chargeCooldowns[frame]:Show()
-        if chargeCooldowns[frame].chargeText then
-            chargeCooldowns[frame].chargeText:SetText(charges)
-            chargeCooldowns[frame].chargeText:Show()
-        end
-    else
-        chargeCooldowns[frame]:Hide()
+    chargeCooldowns[frame]:SetCooldown(chargeStart, chargeDuration, chargeModRate)
+    chargeCooldowns[frame]:Show()
+    if chargeCooldowns[frame].chargeText then
+        HH_SetText(chargeCooldowns[frame].chargeText, charges)
+        chargeCooldowns[frame].chargeText:Show()
     end
 end
 
@@ -667,8 +722,8 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
         charges, maxCharges, chargeStart, chargeDuration, chargeModRate = chargeInfo.currentCharges, chargeInfo.maxCharges, chargeInfo.cooldownStartTime, chargeInfo.cooldownDuration, chargeInfo.chargeModRate
     end
 
-    if locStart and locDuration and start and duration then
-        if (locStart + locDuration) > (start + duration) then
+    if start and duration then
+        if HH_SumGreater(locStart, locDuration, start, duration) == true then
             if currentCooldownType[self.cooldown] ~= COOLDOWN_TYPE_LOSS_OF_CONTROL then
                 self.cooldown:SetEdgeTexture("Interface\\Cooldown\\UI-HUD-ActionBar-LoC")
                 self.cooldown:SetSwipeColor(0.17, 0, 0)
@@ -686,8 +741,8 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
                 currentCooldownType[self.cooldown] = COOLDOWN_TYPE_NORMAL
             end
 
-            if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
-                HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate)
+            if HH_Greater(maxCharges, 1) == true and HH_Greater(maxCharges, charges) == true then
+                HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate, charges)
             else
                 HH_ClearChargeCooldown(self)
             end
@@ -697,13 +752,20 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
     end
 end
 
+local function HH_GetChargeInfo(spellID)
+    local info, maxCharges, chargeStart, chargeDuration, chargeModRate = HealerHelper:GetSpellCharges(spellID)
+    if type(info) == "table" then return info.currentCharges, info.maxCharges, info.cooldownStartTime, info.cooldownDuration, info.chargeModRate end
+
+    return info, maxCharges, chargeStart, chargeDuration, chargeModRate
+end
+
 local function HH_ActionButton_UpdateCooldown(self)
     local start, duration, enable, charges, maxCharges, chargeStart, chargeDuration
     local modRate = 1.0
     local chargeModRate = 1.0
     if self:GetAttribute("spell") then
         start, duration, enable, modRate = GetSpellCooldown(self:GetAttribute("spell"))
-        charges, maxCharges, chargeStart, chargeDuration, chargeModRate = HealerHelper:GetSpellCharges(self:GetAttribute("spell"))
+        charges, maxCharges, chargeStart, chargeDuration, chargeModRate = HH_GetChargeInfo(self:GetAttribute("spell"))
     end
 
     if self.cooldown.currentCooldownType ~= COOLDOWN_TYPE_NORMAL then
@@ -714,9 +776,9 @@ local function HH_ActionButton_UpdateCooldown(self)
     end
 
     if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
-        HH_StartChargeCooldown(self, self.chargeCooldown, chargeStart, chargeDuration, chargeModRate)
+        HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate, charges)
     else
-        HH_ClearChargeCooldown(self, self.chargeCooldown)
+        HH_ClearChargeCooldown(self)
     end
 
     HH_CooldownFrame_Set(self.cooldown, start, duration, enable, false, modRate)
@@ -929,20 +991,26 @@ function HealerHelper:AddActionButton(frame, bar, i)
     function customButton:UpdateCount()
         if Counts[self] == nil then return end
         local text = Counts[self]
-        if self:GetAttribute("spell") == nil then
+        local spell = self:GetAttribute("spell")
+        if spell == nil then
             text:SetText("")
             return
         end
 
-        local info = HealerHelper:GetSpellCharges(self:GetAttribute("spell"))
+        local info = HealerHelper:GetSpellCharges(spell)
         if info and info.currentCharges ~= nil and info.maxCharges ~= nil then
-            if info.maxCharges > 1 then
-                text:SetText(info.currentCharges)
+            if HH_Greater(info.maxCharges, 1) == true then
+                HH_SetText(text, info.currentCharges)
             else
                 text:SetText("")
             end
-        elseif HealerHelper:GetSpellCastCount(self:GetAttribute("spell")) and HealerHelper:GetSpellCastCount(self:GetAttribute("spell")) > 0 then
-            text:SetText(HealerHelper:GetSpellCastCount(self:GetAttribute("spell")))
+
+            return
+        end
+
+        local castCount = HealerHelper:GetSpellCastCount(spell)
+        if HH_Greater(castCount, 0) == true then
+            HH_SetText(text, castCount)
         else
             text:SetText("")
         end
@@ -1263,7 +1331,7 @@ function HealerHelper:AddIcons(frame)
     if name == nil then return end
     HealerHelper:AddIcon(frame, "HH_Leader", "UI-HUD-UnitFrame-Player-Group-LeaderIcon", nil, "BOTTOM", frame, "TOP", 0, -5, function(parent, icon)
         if parent.unit == nil then return end
-        if UnitIsGroupLeader and UnitIsGroupLeader(parent.unit) then
+        if UnitIsGroupLeader and HH_Truth(UnitIsGroupLeader(parent.unit)) == true then
             icon:SetAlpha(1)
         else
             icon:SetAlpha(0)
@@ -1272,11 +1340,9 @@ function HealerHelper:AddIcons(frame)
 
     HealerHelper:AddIcon(frame, "HH_TargetingIcon", nil, nil, "LEFT", frame, "LEFT", 4, 0, function(parent, icon)
         if parent.unit == nil then return end
-        if GetRaidTargetIndex(parent.unit) then
-            icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. GetRaidTargetIndex(parent.unit))
-        else
-            icon:SetTexture(nil)
-        end
+        local index = GetRaidTargetIndex(parent.unit)
+        if HH_Truth(index) == true and pcall(HH_RawSetRaidTargetTexture, icon, index) then return end
+        icon:SetTexture(nil)
     end, 0.2, 0.4)
 
     local flagIcon = HealerHelper:AddIcon(frame, "HH_Flag", nil, nil, "TOPRIGHT", frame, "TOPRIGHT", -2, -8, function(parent, icon)

@@ -109,7 +109,14 @@ function HealerHelper:AddDispellBorder(frame)
     DebuffBorder:SetSize(sw * 1.56, sh * 1.58)
     DebuffBorder:Hide()
     local function OnDebuffDispellable()
-        local c, debuffcolor = HealerHelper:GetDispellableDebuffsCount(frame.unit)
+        local ok, c, debuffcolor = pcall(HealerHelper.GetDispellableDebuffsCount, HealerHelper, frame.unit)
+        if not ok then
+            if DebuffBorder then DebuffBorder:Hide() end
+            C_Timer.After(5, OnDebuffDispellable)
+
+            return
+        end
+
         if DebuffBorder then
             if c > 0 then
                 DebuffBorder:Show()
@@ -123,7 +130,7 @@ function HealerHelper:AddDispellBorder(frame)
         end
 
         local delay = IsInRaid() and 0.25 or 0.01
-        C_Timer.After(delay, function() OnDebuffDispellable() end)
+        C_Timer.After(delay, OnDebuffDispellable)
     end
 
     OnDebuffDispellable()
