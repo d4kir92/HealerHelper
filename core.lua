@@ -337,6 +337,7 @@ function HealerHelper:UpdateHealBarsLayout()
 end
 
 local previousGroupSize = 0
+local previousInRaid = false
 function HealerHelper:CheckForNewFrames()
     local c = HealerHelper:UpdateAllowedUnitFrames()
     if c > 0 then
@@ -398,6 +399,12 @@ function HealerHelper:UpdateRaidTargets()
     end
 end
 
+local function RefreshGroupFrames()
+    HealerHelper:CheckForNewFrames()
+    HealerHelper:UpdateRaidTargets()
+    HealerHelper:UpdateHealBarsLayout()
+end
+
 local infoPending = false
 function HealerHelper:UpdateUnitFrameInfos()
     if infoPending then return end
@@ -430,13 +437,17 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
     elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_NAME_UPDATE" or event == "UNIT_CONNECTION" or event == "UNIT_LEVEL" then
         if event == "GROUP_ROSTER_UPDATE" then
             local currentGroupSize = GetNumGroupMembers()
-            if currentGroupSize ~= previousGroupSize then
+            local currentInRaid = IsInRaid()
+            local raidChanged = currentInRaid ~= previousInRaid
+            if currentGroupSize ~= previousGroupSize or raidChanged then
                 previousGroupSize = currentGroupSize
+                previousInRaid = currentInRaid
                 HealerHelper:CheckForNewFrames()
             end
 
             HealerHelper:UpdateRaidTargets()
             HealerHelper:UpdateHealBarsLayout()
+            if raidChanged then C_Timer.After(0.5, RefreshGroupFrames) end
         end
 
         HealerHelper:UpdateUnitFrameInfos()
@@ -466,11 +477,11 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
         HealerHelper:InitSettings()
         C_Timer.After(2, function()
             local currentGroupSize = GetNumGroupMembers()
-            if currentGroupSize ~= previousGroupSize then
+            local currentInRaid = IsInRaid()
+            if currentGroupSize ~= previousGroupSize or currentInRaid ~= previousInRaid then
                 previousGroupSize = currentGroupSize
-                HealerHelper:CheckForNewFrames()
-                HealerHelper:UpdateRaidTargets()
-                HealerHelper:UpdateHealBarsLayout()
+                previousInRaid = currentInRaid
+                RefreshGroupFrames()
             end
         end)
     end
@@ -625,14 +636,19 @@ local function HH_CooldownActive(enable, duration)
     return res
 end
 
+local function HH_RawSetCooldown(cooldownFrame, start, duration, modRate)
+    cooldownFrame:SetCooldown(start, duration, modRate)
+end
+
 local function HH_CooldownFrame_Set(cooldownFrame, start, duration, enable, showCooldownFrame)
     local active = HH_CooldownActive(enable, duration)
-    if active == nil or active == true then
-        cooldownFrame:SetCooldown(start, duration)
+    if (active == nil or active == true) and pcall(HH_RawSetCooldown, cooldownFrame, start, duration) then
         if showCooldownFrame then cooldownFrame:Show() end
-    else
-        cooldownFrame:Hide()
+
+        return
     end
+
+    cooldownFrame:Hide()
 end
 
 local chargeCooldowns = {}
@@ -650,8 +666,11 @@ end
 
 local function HH_StartChargeCooldown(frame, chargeStart, chargeDuration, chargeModRate)
     chargeCooldowns[frame] = chargeCooldowns[frame] or HH_CreateChargeCooldownFrame(frame)
-    chargeCooldowns[frame]:SetCooldown(chargeStart, chargeDuration, chargeModRate)
-    chargeCooldowns[frame]:Show()
+    if pcall(HH_RawSetCooldown, chargeCooldowns[frame], chargeStart, chargeDuration, chargeModRate) then
+        chargeCooldowns[frame]:Show()
+    else
+        chargeCooldowns[frame]:Hide()
+    end
 end
 
 local function HH_ClearChargeCooldown(frame)
