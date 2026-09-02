@@ -71,6 +71,8 @@ runAfterCombat:SetScript("OnEvent", function(sel, event)
             local args = tab.args
             callback(unpack(args))
         end
+
+        HealerHelper:UpdateHealBarsLayout()
     end
 end)
 
@@ -275,7 +277,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
     end, {fra}, "AddUpdateFramePosition", fra, nr, gro)
 end
 
-function HealerHelper:UpdateHealBarsLayout()
+local function DoUpdateHealBarsLayout()
     if test then return end
     test = true
     if IsInRaid() then
@@ -305,8 +307,19 @@ function HealerHelper:UpdateHealBarsLayout()
         end
     end
 
+    HealerHelper:EnsureAllActionButtons()
     HealerHelper:UpdateStates()
     test = false
+end
+
+local layoutPending = false
+function HealerHelper:UpdateHealBarsLayout()
+    if test or layoutPending then return end
+    layoutPending = true
+    C_Timer.After(0, function()
+        layoutPending = false
+        DoUpdateHealBarsLayout()
+    end)
 end
 
 local previousGroupSize = 0
@@ -327,6 +340,7 @@ end
 function HealerHelper:UpdateStateBtn(i, btn)
     if i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2) then
         if HealerHelper:GetParent(btn) ~= btn:GetAttribute("HEAHEL_bar") then
+            btn.hhDW = nil
             btn:SetAttribute("HEAHEL_ignore", false)
             btn:Show()
             btn:SetParent(btn:GetAttribute("HEAHEL_bar"))
@@ -343,6 +357,7 @@ function HealerHelper:UpdateStateBtn(i, btn)
         end
     else
         if HealerHelper:GetParent(btn) ~= HEAHEL_HIDDEN then
+            btn.hhDW = nil
             btn:SetAttribute("HEAHEL_ignore", true)
             btn:Hide()
             btn:SetParent(HEAHEL_HIDDEN)
@@ -369,6 +384,25 @@ function HealerHelper:UpdateRaidTargets()
     end
 end
 
+local infoPending = false
+function HealerHelper:UpdateUnitFrameInfos()
+    if infoPending then return end
+    infoPending = true
+    C_Timer.After(0, function()
+        infoPending = false
+        for frame, name in pairs(unitFrames) do
+            local stats = frame["HH_Stats"]
+            local level = frame["HH_Level"]
+            local leader = frame["HH_Leader"]
+            local flag = frame["HH_Flag"]
+            if stats then stats.func(frame, stats) end
+            if level then level.func(frame, level) end
+            if leader then leader.func(frame, leader) end
+            if flag then flag.func(frame, flag) end
+        end
+    end)
+end
+
 local healerHelper = CreateFrame("Frame")
 HealerHelper:RegisterEvent(healerHelper, "ADDON_LOADED")
 HealerHelper:RegisterEvent(healerHelper, "GROUP_ROSTER_UPDATE")
@@ -391,16 +425,7 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
             HealerHelper:UpdateHealBarsLayout()
         end
 
-        for frame, name in pairs(unitFrames) do
-            local stats = frame["HH_Stats"]
-            local level = frame["HH_Level"]
-            local leader = frame["HH_Leader"]
-            local flag = frame["HH_Flag"]
-            if stats then stats.func(frame, stats) end
-            if level then level.func(frame, level) end
-            if leader then leader.func(frame, leader) end
-            if flag then flag.func(frame, flag) end
-        end
+        HealerHelper:UpdateUnitFrameInfos()
     elseif event == "ADDON_LOADED" then
         if select(1, ...) ~= AddonName then return end
         HEAHELPC = HEAHELPC or {}
@@ -454,9 +479,18 @@ function HealerHelper:SetSpellForBtn(b, i)
     end, {b}, "SetSpellForBtn", b, i)
 end
 
-function HealerHelper:SetSpell(btn, id, i)
+local registeredButtons = {}
+function HealerHelper:RegisterActionButton(btn, i)
+    if btn == nil then return end
     actionbuttons[i] = actionbuttons[i] or {}
-    if not tContains(actionbuttons[i], btn) then tinsert(actionbuttons[i], btn) end
+    if registeredButtons[btn] == nil then
+        registeredButtons[btn] = i
+        tinsert(actionbuttons[i], btn)
+    end
+end
+
+function HealerHelper:SetSpell(btn, id, i)
+    HealerHelper:RegisterActionButton(btn, i)
     for x, v in pairs(actionbuttons[i]) do
         HealerHelper:SetSpellForBtn(v, id)
     end
@@ -479,8 +513,7 @@ function HealerHelper:ClearSpellForBtn(b)
 end
 
 function HealerHelper:ClearSpell(btn, i)
-    actionbuttons[i] = actionbuttons[i] or {}
-    if not tContains(actionbuttons[i], btn) then tinsert(actionbuttons[i], btn) end
+    HealerHelper:RegisterActionButton(btn, i)
     for x, v in pairs(actionbuttons[i]) do
         HealerHelper:ClearSpellForBtn(v)
     end
@@ -758,12 +791,13 @@ function HealerHelper:AddActionButton(frame, bar, i)
     end
 
     if customButton.SpellCastAnimFrame then customButton.SpellCastAnimFrame:SetScript("OnHide", function() end) end
-    if registered[customButton] == false then customButton:RegisterEvents() end
+    if HealerHelper:GetParent(customButton) == bar and registered[customButton] == false then customButton:RegisterEvents() end
     hooksecurefunc(customButton, "SetParent", function(sel, pa)
         if pa == bar then
             if registered[customButton] == false then customButton:RegisterEvents() end
         else
             if registered[customButton] == true then
+                registered[customButton] = false
                 customButton:UnregisterAllEvents()
                 customButtonEvents:UnregisterAllEvents()
             end
@@ -930,8 +964,10 @@ function HealerHelper:AddActionButton(frame, bar, i)
         local ACTIONBUTTONPERROW = HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5)
         local ROWS = HealerHelper:GetOptionValue("ROWS", 2)
         local sw = sel:GetWidth()
+        local sh = frame:GetHeight()
+        if customButton.hhDW == sw and customButton.hhDH == sh and customButton.hhDPerRow == ACTIONBUTTONPERROW and customButton.hhDRows == ROWS then return end
         bar:SetWidth(sw)
-        bar:SetHeight(frame:GetHeight())
+        bar:SetHeight(sh)
         local row = math.floor((i - 1) / ACTIONBUTTONPERROW)
         local col = (i - 1) % ACTIONBUTTONPERROW
         local xOffset = col * customButton:GetWidth()
@@ -944,13 +980,19 @@ function HealerHelper:AddActionButton(frame, bar, i)
 
         customButton:ClearAllPoints()
         if bar and xOffset and yOffset then customButton:SetPoint("TOPLEFT", bar, "TOPLEFT", xOffset, yOffset) end
+        customButton.hhDW = sw
+        customButton.hhDH = sh
+        customButton.hhDPerRow = ACTIONBUTTONPERROW
+        customButton.hhDRows = ROWS
     end
 
     customButton:UpdateDesign(frame)
-    if HealerHelper:GetOptionValue("spell" .. i) ~= nil then
-        HealerHelper:SetSpell(customButton, HealerHelper:GetOptionValue("spell" .. i), i)
+    HealerHelper:RegisterActionButton(customButton, i)
+    local btnSpell = HealerHelper:GetOptionValue("spell" .. i)
+    if btnSpell ~= nil then
+        HealerHelper:SetSpellForBtn(customButton, btnSpell)
     else
-        HealerHelper:ClearSpell(customButton, i)
+        HealerHelper:ClearSpellForBtn(customButton)
     end
 
     customButton:RegisterForDrag("LeftButton")
@@ -1011,6 +1053,37 @@ function HealerHelper:AddActionButton(frame, bar, i)
     end
 
     customButton:UpdateCount()
+end
+
+local bars = {}
+local buttonCounts = {}
+local function GetNeededActionButtonCount()
+    HEAHELPC = HEAHELPC or {}
+    local party = (HEAHELPC["ROWS"] or 2) * (HEAHELPC["ACTIONBUTTONPERROW"] or 5)
+    local raid = (HEAHELPC["RROWS"] or 2) * (HEAHELPC["RACTIONBUTTONPERROW"] or 5)
+    local needed = math.max(party, raid)
+    if needed < 1 then needed = 1 end
+    if needed > 24 then needed = 24 end
+    return needed
+end
+
+function HealerHelper:EnsureActionButtons(unitFrame, bar)
+    if unitFrame == nil or bar == nil then return end
+    local needed = GetNeededActionButtonCount()
+    local have = buttonCounts[bar] or 0
+    if needed <= have then return end
+    if InCombatLockdown() then return end
+    for i = have + 1, needed do
+        HealerHelper:AddActionButton(unitFrame, bar, i)
+    end
+
+    buttonCounts[bar] = needed
+end
+
+function HealerHelper:EnsureAllActionButtons()
+    for unitFrame, bar in pairs(bars) do
+        HealerHelper:EnsureActionButtons(unitFrame, bar)
+    end
 end
 
 function HealerHelper:AddHealbar(unitFrame)
@@ -1092,9 +1165,8 @@ function HealerHelper:AddHealbar(unitFrame)
             RegisterStateDriver(handler, "visibility", "[group] show; hide")
         end
 
-        for i = 1, 24 do
-            HealerHelper:AddActionButton(unitFrame, bar, i)
-        end
+        bars[unitFrame] = bar
+        HealerHelper:EnsureActionButtons(unitFrame, bar)
     end
 end
 
