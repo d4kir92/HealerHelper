@@ -7,6 +7,20 @@ local ActionButtonCastType = {
 
 local actionbuttons = {}
 local healBars = {}
+local activeButtons = {}
+local buttonsBySpell = {}
+local buttonSpell = {}
+local function SetButtonSpellIndex(btn, id)
+    local old = buttonSpell[btn]
+    if old == id then return end
+    if old ~= nil and buttonsBySpell[old] then buttonsBySpell[old][btn] = nil end
+    buttonSpell[btn] = id
+    if id ~= nil then
+        buttonsBySpell[id] = buttonsBySpell[id] or {}
+        buttonsBySpell[id][btn] = true
+    end
+end
+
 local HEAHEL_HIDDEN = CreateFrame("Frame", "HEAHEL_HIDDEN")
 HEAHEL_HIDDEN:Hide()
 function HealerHelper:GetOptionValue(name, defaultVal)
@@ -471,6 +485,7 @@ function HealerHelper:SetSpellForBtn(b, i)
         btn:SetAttribute("type", "spell")
         btn:SetAttribute("type1", "spell")
         btn:SetAttribute("spell1", id)
+        SetButtonSpellIndex(btn, id)
         if false then
             btn:SetAttribute("action", nil)
             btn:SetAttribute("action1", nil)
@@ -504,6 +519,7 @@ function HealerHelper:ClearSpellForBtn(b)
         btn:SetAttribute("type", nil)
         btn:SetAttribute("type1", nil)
         btn:SetAttribute("spell1", nil)
+        SetButtonSpellIndex(btn, nil)
         if false then
             btn:SetAttribute("action", nil)
             btn:SetAttribute("action1", nil)
@@ -747,6 +763,130 @@ end
 
 local Counts = {}
 local registered = {}
+local dispatcherUnitEvents = {
+    "UNIT_SPELLCAST_INTERRUPTED",
+    "UNIT_SPELLCAST_SUCCEEDED",
+    "UNIT_SPELLCAST_FAILED",
+    "UNIT_SPELLCAST_START",
+    "UNIT_SPELLCAST_STOP",
+    "UNIT_SPELLCAST_CHANNEL_START",
+    "UNIT_SPELLCAST_CHANNEL_STOP",
+    "UNIT_SPELLCAST_RETICLE_TARGET",
+    "UNIT_SPELLCAST_RETICLE_CLEAR",
+    "UNIT_SPELLCAST_EMPOWER_START",
+    "UNIT_SPELLCAST_EMPOWER_STOP",
+}
+
+local dispatcherEvents = {
+    "UNIT_SPELLCAST_SENT",
+    "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",
+    "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",
+    "SPELL_UPDATE_ICON",
+    "SPELL_UPDATE_CHARGES",
+    "ACTIONBAR_UPDATE_STATE",
+    "ACTIONBAR_UPDATE_COOLDOWN",
+}
+
+local function HandleButtonEvent(customButton, event, ...)
+    local frame = customButton.hhFrame
+    if frame == nil then return end
+    if not frame:IsShown() or not customButton:IsShown() then return end
+    local frameParent = HealerHelper:GetParent(frame)
+    if frameParent and not frameParent:IsShown() then return end
+    local spellID = select(3, ...)
+    if spellID == customButton:GetAttribute("spell") or spellID == nil then
+        if event == "ACTIONBAR_UPDATE_COOLDOWN" then
+            if customButton:GetAttribute("spell") then
+                if HealerHelper:GetWoWBuild() == "RETAIL" then
+                    HH_RETAIL_ActionButton_UpdateCooldown(customButton)
+                else
+                    HH_ActionButton_UpdateCooldown(customButton)
+                end
+            end
+        elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+            spellID = select(1, ...)
+            if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_ShowOverlayGlow then HealerHelper:Glow(customButton) end
+        elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
+            spellID = select(1, ...)
+            if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_HideOverlayGlow then HealerHelper:Unglow(customButton) end
+        elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
+            customButton:PlaySpellInterruptedAnim()
+        elseif event == "UNIT_SPELLCAST_START" then
+            customButton:PlaySpellCastAnim(ActionButtonCastType.Cast)
+        elseif event == "UNIT_SPELLCAST_STOP" then
+            customButton:StopSpellCastAnim(true, ActionButtonCastType.Cast)
+            customButton:StopTargettingReticleAnim()
+        elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+            customButton:StopSpellCastAnim(false, ActionButtonCastType.Cast)
+            customButton:StopTargettingReticleAnim()
+        elseif event == "UNIT_SPELLCAST_SENT" or event == "UNIT_SPELLCAST_FAILED" then
+            customButton:StopTargettingReticleAnim()
+        elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
+            customButton:PlaySpellCastAnim(ActionButtonCastType.Empowered)
+        elseif event == "UNIT_SPELLCAST_EMPOWER_STOP" then
+            local _, _, _, castComplete = ...
+            local interrupted = not castComplete
+            if interrupted then
+                customButton:PlaySpellInterruptedAnim()
+            else
+                customButton:StopSpellCastAnim(interrupted, ActionButtonCastType.Empowered)
+            end
+        elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
+            customButton:PlaySpellCastAnim(ActionButtonCastType.Channel)
+        elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+            customButton:StopSpellCastAnim(false, ActionButtonCastType.Channel)
+        elseif event == "UNIT_SPELLCAST_RETICLE_TARGET" then
+            customButton:PlayTargettingReticleAnim()
+        elseif event == "UNIT_SPELLCAST_RETICLE_CLEAR" then
+            customButton:StopTargettingReticleAnim()
+        elseif event == "SPELL_UPDATE_CHARGES" then
+            customButton:UpdateCount()
+        elseif event == "ACTIONBAR_UPDATE_STATE" then
+            customButton:UpdateCount()
+        elseif event == "SPELL_UPDATE_ICON" then
+            local _, _, iconTexture = HealerHelper:GetSpellInfo(customButton:GetAttribute("spell"))
+            if customButton.icon then customButton.icon:SetTexture(iconTexture) end
+        end
+    end
+end
+
+local dispatcher = CreateFrame("Frame")
+dispatcher:SetScript("OnEvent", function(sel, event, ...)
+    local spellID = select(3, ...)
+    if spellID ~= nil then
+        local bySpell = buttonsBySpell[spellID]
+        if bySpell == nil then return end
+        for btn in pairs(bySpell) do
+            if activeButtons[btn] then HandleButtonEvent(btn, event, ...) end
+        end
+
+        return
+    end
+
+    for btn in pairs(activeButtons) do
+        HandleButtonEvent(btn, event, ...)
+    end
+end)
+
+local dispatcherReady = false
+local function ActivateActionButton(btn)
+    if activeButtons[btn] then return end
+    activeButtons[btn] = true
+    if dispatcherReady then return end
+    dispatcherReady = true
+    for x = 1, #dispatcherUnitEvents do
+        HealerHelper:RegisterEvent(dispatcher, dispatcherUnitEvents[x], "player")
+    end
+
+    for x = 1, #dispatcherEvents do
+        HealerHelper:RegisterEvent(dispatcher, dispatcherEvents[x])
+    end
+end
+
+local function DeactivateActionButton(btn)
+    activeButtons[btn] = nil
+end
+
 function HealerHelper:AddActionButton(frame, bar, i)
     local name = bar:GetName()
     if name == nil then return end
@@ -762,32 +902,14 @@ function HealerHelper:AddActionButton(frame, bar, i)
         Counts[customButton]:SetFont(f1, 18, f3)
     end
 
-    local customButtonEvents = CreateFrame("Frame", name .. "Events_BTN_" .. i)
+    customButton.hhFrame = frame
     customButton:SetAttribute("HEAHEL_bar", bar)
     HealerHelper:UpdateStateBtn(i, customButton)
     registered[customButton] = false
     function customButton:RegisterEvents()
         registered[customButton] = true
         customButton:UnregisterAllEvents()
-        customButtonEvents:UnregisterAllEvents()
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_INTERRUPTED", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_SUCCEEDED", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_FAILED", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_START", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_STOP", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_CHANNEL_START", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_CHANNEL_STOP", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_RETICLE_TARGET", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_RETICLE_CLEAR", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_EMPOWER_START", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_EMPOWER_STOP", "player")
-        HealerHelper:RegisterEvent(customButtonEvents, "UNIT_SPELLCAST_SENT")
-        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
-        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
-        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_UPDATE_ICON")
-        HealerHelper:RegisterEvent(customButtonEvents, "SPELL_UPDATE_CHARGES")
-        HealerHelper:RegisterEvent(customButtonEvents, "ACTIONBAR_UPDATE_STATE")
-        HealerHelper:RegisterEvent(customButtonEvents, "ACTIONBAR_UPDATE_COOLDOWN")
+        ActivateActionButton(customButton)
     end
 
     if customButton.SpellCastAnimFrame then customButton.SpellCastAnimFrame:SetScript("OnHide", function() end) end
@@ -799,7 +921,7 @@ function HealerHelper:AddActionButton(frame, bar, i)
             if registered[customButton] == true then
                 registered[customButton] = false
                 customButton:UnregisterAllEvents()
-                customButtonEvents:UnregisterAllEvents()
+                DeactivateActionButton(customButton)
             end
         end
     end)
@@ -878,66 +1000,6 @@ function HealerHelper:AddActionButton(frame, bar, i)
     customButton:SetScript("OnHide", function(sel) end)
     customButton:SetScript("OnEnter", function(sel) end)
     customButton:SetScript("OnLeave", function(sel) end)
-    customButtonEvents:SetScript("OnEvent", function(sel, event, ...)
-        if not frame:IsShown() or not customButton:IsShown() then return end
-        if HealerHelper:GetParent(frame) and not HealerHelper:GetParent(frame):IsShown() then return end
-        local spellID = select(3, ...)
-        if spellID == customButton:GetAttribute("spell") or spellID == nil then
-            if event == "ACTIONBAR_UPDATE_COOLDOWN" then
-                if customButton:GetAttribute("spell") then
-                    if HealerHelper:GetWoWBuild() == "RETAIL" then
-                        HH_RETAIL_ActionButton_UpdateCooldown(customButton)
-                    else
-                        HH_ActionButton_UpdateCooldown(customButton)
-                    end
-                end
-            elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
-                spellID = select(1, ...)
-                if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_ShowOverlayGlow then HealerHelper:Glow(customButton) end
-            elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
-                spellID = select(1, ...)
-                if (spellID == customButton:GetAttribute("spell") or (spellID == 462603 and customButton:GetAttribute("spell") == 73920)) and ActionButton_HideOverlayGlow then HealerHelper:Unglow(customButton) end
-            elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
-                customButton:PlaySpellInterruptedAnim()
-            elseif event == "UNIT_SPELLCAST_START" then
-                customButton:PlaySpellCastAnim(ActionButtonCastType.Cast)
-            elseif event == "UNIT_SPELLCAST_STOP" then
-                customButton:StopSpellCastAnim(true, ActionButtonCastType.Cast)
-                customButton:StopTargettingReticleAnim()
-            elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-                customButton:StopSpellCastAnim(false, ActionButtonCastType.Cast)
-                customButton:StopTargettingReticleAnim()
-            elseif event == "UNIT_SPELLCAST_SENT" or event == "UNIT_SPELLCAST_FAILED" then
-                customButton:StopTargettingReticleAnim()
-            elseif event == "UNIT_SPELLCAST_EMPOWER_START" then
-                customButton:PlaySpellCastAnim(ActionButtonCastType.Empowered)
-            elseif event == "UNIT_SPELLCAST_EMPOWER_STOP" then
-                local _, _, _, castComplete = ...
-                local interrupted = not castComplete
-                if interrupted then
-                    customButton:PlaySpellInterruptedAnim()
-                else
-                    customButton:StopSpellCastAnim(interrupted, ActionButtonCastType.Empowered)
-                end
-            elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
-                customButton:PlaySpellCastAnim(ActionButtonCastType.Channel)
-            elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
-                customButton:StopSpellCastAnim(false, ActionButtonCastType.Channel)
-            elseif event == "UNIT_SPELLCAST_RETICLE_TARGET" then
-                customButton:PlayTargettingReticleAnim()
-            elseif event == "UNIT_SPELLCAST_RETICLE_CLEAR" then
-                customButton:StopTargettingReticleAnim()
-            elseif event == "SPELL_UPDATE_CHARGES" then
-                customButton:UpdateCount()
-            elseif event == "ACTIONBAR_UPDATE_STATE" then
-                customButton:UpdateCount()
-            elseif event == "SPELL_UPDATE_ICON" then
-                local _, _, iconTexture = HealerHelper:GetSpellInfo(customButton:GetAttribute("spell"))
-                if customButton.icon then customButton.icon:SetTexture(iconTexture) end
-            end
-        end
-    end)
-
     if customButton then
         HealerHelper:TryRunSecure(function(btn, parent)
             btn:SetAttribute("type", "spell")
