@@ -648,20 +648,15 @@ local function HH_CreateChargeCooldownFrame(parent)
     return chargeCooldowns[parent]
 end
 
-local function HH_StartChargeCooldown(frame, chargeStart, chargeDuration, chargeModRate, charges)
+local function HH_StartChargeCooldown(frame, chargeStart, chargeDuration, chargeModRate)
     chargeCooldowns[frame] = chargeCooldowns[frame] or HH_CreateChargeCooldownFrame(frame)
     chargeCooldowns[frame]:SetCooldown(chargeStart, chargeDuration, chargeModRate)
     chargeCooldowns[frame]:Show()
-    if chargeCooldowns[frame].chargeText then
-        HH_SetText(chargeCooldowns[frame].chargeText, charges)
-        chargeCooldowns[frame].chargeText:Show()
-    end
 end
 
 local function HH_ClearChargeCooldown(frame)
     chargeCooldowns[frame] = chargeCooldowns[frame] or HH_CreateChargeCooldownFrame(frame)
     chargeCooldowns[frame]:Hide()
-    if chargeCooldowns[frame].chargeText then chargeCooldowns[frame].chargeText:Hide() end
 end
 
 local defaultCooldownInfo = {
@@ -742,7 +737,7 @@ local function HH_RETAIL_ActionButton_UpdateCooldown(self)
             end
 
             if HH_Greater(maxCharges, 1) == true and HH_Greater(maxCharges, charges) == true then
-                HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate, charges)
+                HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate)
             else
                 HH_ClearChargeCooldown(self)
             end
@@ -776,7 +771,7 @@ local function HH_ActionButton_UpdateCooldown(self)
     end
 
     if charges and maxCharges and maxCharges > 1 and charges < maxCharges then
-        HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate, charges)
+        HH_StartChargeCooldown(self, chargeStart, chargeDuration, chargeModRate)
     else
         HH_ClearChargeCooldown(self)
     end
