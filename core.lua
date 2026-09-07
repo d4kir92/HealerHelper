@@ -44,6 +44,28 @@ function HealerHelper:SetOptionValue(name, val)
     HEAHELPC[name] = val
 end
 
+function HealerHelper:AreActionButtonsEnabled()
+    return HealerHelper:GetOptionValue("ACTIONBUTTONS", true) == true
+end
+
+function HealerHelper:GetBarWidth(bar)
+    if bar == nil or not HealerHelper:AreActionButtonsEnabled() then return 0 end
+
+    return bar:GetWidth() or 0
+end
+
+function HealerHelper:GetBarHeight(bar)
+    if bar == nil or not HealerHelper:AreActionButtonsEnabled() then return 0 end
+
+    return bar:GetHeight() or 0
+end
+
+function HealerHelper:GetBarOffset()
+    if not HealerHelper:AreActionButtonsEnabled() then return 0 end
+
+    return HealerHelper:GetOptionValue("OFFSET") or 0
+end
+
 local unitFrames = {}
 function HealerHelper:AddUnitFrame(name)
     local uf = _G[name]
@@ -177,7 +199,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
                 if UnitExists(fra.unit) then
                     local roleParty = UnitGroupRolesAssigned(fra.unit)
                     local name = UnitName(fra.unit)
-                    if frameName then frameName:SetText(format("|A:%s:16:16:0:0|a %s", HealerHelper:GetRoleIcon(roleParty), name)) end
+                    if frameName and not HealerHelper:IsSecret(name) then frameName:SetText(format("|A:%s:16:16:0:0|a %s", HealerHelper:GetRoleIcon(roleParty), name)) end
                 end
 
                 sel.hh_set_text = false
@@ -241,10 +263,10 @@ local function AddUpdateFramePosition(fra, nr, gro)
                     frame:ClearAllPoints()
                     if direction == "DOWN" then
                         if HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT" then
-                            frame:SetPoint("LEFT", previousFrame, "RIGHT", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                            frame:SetPoint("LEFT", previousFrame, "RIGHT", HealerHelper:GetBarWidth(bar) + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetBarOffset(), 0)
                             HealerHelper:UpdateFramePosition(frame)
                         elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
-                            frame:SetPoint("TOP", previousFrame, "TOP", bar:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET"), 0)
+                            frame:SetPoint("TOP", previousFrame, "TOP", frame:GetWidth() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetBarOffset(), 0)
                             HealerHelper:UpdateFramePosition(frame)
                         end
                     else
@@ -252,7 +274,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
                             frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -HealerHelper:GetOptionValue("GAPY"))
                             HealerHelper:UpdateFramePosition(frame)
                         elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
-                            frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(bar:GetHeight() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")))
+                            frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -(HealerHelper:GetBarHeight(bar) + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetBarOffset()))
                             HealerHelper:UpdateFramePosition(frame)
                         end
                     end
@@ -268,14 +290,14 @@ local function AddUpdateFramePosition(fra, nr, gro)
                         if (HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT") and direction == "DOWN" then
                             spacingY = HealerHelper:GetOptionValue("GAPY")
                         elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "DOWN" then
-                            spacingY = bar:GetHeight() * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetOptionValue("OFFSET")
+                            spacingY = HealerHelper:GetBarHeight(bar) * bar:GetScale() + HealerHelper:GetOptionValue("GAPY") + HealerHelper:GetBarOffset()
                         end
 
                         frame:SetPoint("TOP", previousFrame, "BOTTOM", 0, -spacingY)
                         HealerHelper:UpdateFramePosition(frame)
                     else
                         if (HealerHelper:GetOptionValue("LAYOUT") == "RIGHT" or HealerHelper:GetOptionValue("LAYOUT") == "LEFT") and direction == "RIGHT" then
-                            spacingX = bar:GetWidth() * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetOptionValue("OFFSET")
+                            spacingX = HealerHelper:GetBarWidth(bar) * bar:GetScale() + HealerHelper:GetOptionValue("GAPX") + HealerHelper:GetBarOffset()
                         elseif HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" and direction == "RIGHT" then
                             spacingX = HealerHelper:GetOptionValue("GAPX")
                         end
@@ -353,7 +375,8 @@ function HealerHelper:CheckForNewFrames()
 end
 
 function HealerHelper:UpdateStateBtn(i, btn)
-    if i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2) then
+    local visible = HealerHelper:AreActionButtonsEnabled() and i <= HealerHelper:GetOptionValue("ACTIONBUTTONPERROW", 5) * HealerHelper:GetOptionValue("ROWS", 2)
+    if visible then
         if HealerHelper:GetParent(btn) ~= btn:GetAttribute("HEAHEL_bar") then
             btn.hhDW = nil
             btn:SetAttribute("HEAHEL_ignore", false)
@@ -472,6 +495,8 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
         if HEAHELPC["ACTIONBUTTONPERROW"] == nil then HEAHELPC["ACTIONBUTTONPERROW"] = 5 end
         if HEAHELPC["RROWS"] == nil then HEAHELPC["RROWS"] = 2 end
         if HEAHELPC["RACTIONBUTTONPERROW"] == nil then HEAHELPC["RACTIONBUTTONPERROW"] = 5 end
+        if HEAHELPC["ACTIONBUTTONS"] == nil then HEAHELPC["ACTIONBUTTONS"] = true end
+        if HEAHELPC["RACTIONBUTTONS"] == nil then HEAHELPC["RACTIONBUTTONS"] = true end
         HealerHelper:LoadRealms()
         HealerHelper:SetAddonOutput("HealerHelper", "134149")
         HealerHelper:InitSettings()
@@ -1384,6 +1409,12 @@ function HealerHelper:AddIcons(frame)
 
         local nam, realmName = UnitName(parent.unit)
         if nam == nil then return end
+        if HealerHelper:IsSecret(nam) or HealerHelper:IsSecret(realmName) then
+            icon:SetTexture(nil)
+
+            return
+        end
+
         if realmName == nil then realmName = GetRealmName() end
         local lang = nil
         if realmName then lang = HealerHelper:GetRealmFlag(realmName) end
