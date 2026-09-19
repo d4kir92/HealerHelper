@@ -1,12 +1,13 @@
 ## Interface: 120100
 ## Interface-Classic: 11509
+## Interface-Forever: 16001
 ## Interface-BCC: 20506
 ## Interface-Wrath: 30403
 ## Interface-Titan: 38002
 ## Interface-Cata: 40402
 ## Interface-Mists: 50504
 
-## Version: 0.8.4
+## Version: 0.8.5
 ## Title: HealerHelper by |cff55d2ffD4KiR |T132115:16:16:0:0|t
 ## Notes: Add Actionbar to Party/RaidFrames
 ## Notes-deDE: Aktionsleiste zu Party-/Raid-Frames hinzufügen
