@@ -197,7 +197,7 @@ function HealerHelper:IsBossCastingSpell(spellID)
     if spellID == spellSeismischesSchmettern then return seismischesSchmettern end
 end
 
-if HealerHelper:GetWoWBuildNr() < 120000 then
+if not HealerHelper:IsForever() and HealerHelper:GetWoWBuildNr() < 120000 then
     local frame = CreateFrame("Frame")
     HealerHelper:RegisterEvent(frame, "COMBAT_LOG_EVENT_UNFILTERED")
     local function OnEvent(self, event)
