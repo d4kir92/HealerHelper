@@ -498,7 +498,7 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
         if HEAHELPC["ACTIONBUTTONS"] == nil then HEAHELPC["ACTIONBUTTONS"] = true end
         if HEAHELPC["RACTIONBUTTONS"] == nil then HEAHELPC["RACTIONBUTTONS"] = true end
         HealerHelper:LoadRealms()
-        HealerHelper:SetAddonOutput("HealerHelper", "134149")
+        HealerHelper:SetAddonOutput()
         HealerHelper:InitSettings()
         C_Timer.After(2, function()
             local currentGroupSize = GetNumGroupMembers()

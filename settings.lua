@@ -98,7 +98,7 @@ local function AddDropdown(key, value, choices, func)
 end
 
 function HealerHelper:InitSettings()
-    HealerHelper:SetVersion(134149, "0.8.8")
+    HealerHelper:SetVersion()
     HEAHELPC = HEAHELPC or {}
     heahel_settings = HealerHelper:CreateUIWindow({
         ["name"] = "HealerHelperSettings",
@@ -113,7 +113,7 @@ function HealerHelper:InitSettings()
         end,
         ["getCollapsed"] = function(key) return GetCollapsed(key) end,
         ["setCollapsed"] = function(key, collapsed) SetCollapsed(key, collapsed) end,
-        ["title"] = format("|T134149:16:16:0:0|t HealerHelper v%s", HealerHelper:GetVersion())
+        ["title"] = format("|T%s:16:16:0:0|t HealerHelper v%s", HealerHelper:GetAddonIcon(), HealerHelper:GetVersion())
     })
 
     heahel_settings:SuspendLayout()
@@ -158,9 +158,9 @@ function HealerHelper:InitSettings()
     HealerHelper:AddSlash("heahel", HealerHelper.ToggleSettings)
     HealerHelper:CreateMinimapButton({
         ["name"] = "HealerHelper",
-        ["icon"] = 134149,
+        ["icon"] = HealerHelper:GetAddonIcon(),
         ["dbtab"] = HEAHELPC,
-        ["vTT"] = {{"|T134149:16:16:0:0|t HealerHelper", "v" .. HealerHelper:GetVersion()}, {HealerHelper:Trans("LID_LEFTCLICK"), HealerHelper:Trans("LID_OPENSETTINGS")}, {HealerHelper:Trans("LID_RIGHTCLICK"), HealerHelper:Trans("LID_HIDEMINIMAPBUTTON")}},
+        ["vTT"] = {{format("|T%s:16:16:0:0|t HealerHelper", HealerHelper:GetAddonIcon()),"v" .. HealerHelper:GetVersion()}, {HealerHelper:Trans("LID_LEFTCLICK"), HealerHelper:Trans("LID_OPENSETTINGS")}, {HealerHelper:Trans("LID_RIGHTCLICK"), HealerHelper:Trans("LID_HIDEMINIMAPBUTTON")}},
         ["funcL"] = function() HealerHelper:ToggleSettings() end,
         ["funcR"] = function() HealerHelper:HideMMBtn("HealerHelper") end,
         ["dbkey"] = "MMBTN"
