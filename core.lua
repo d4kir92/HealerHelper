@@ -67,6 +67,28 @@ function HealerHelper:GetBarOffset()
 end
 
 local unitFrames = {}
+local ellesmereFrames = {}
+
+local function AddEllesmereFrame(frame, name)
+    if frame and not unitFrames[frame] then
+        unitFrames[frame] = name
+        ellesmereFrames[frame] = true
+        return 1
+    end
+    return 0
+end
+
+local function AddEllesmereHeader(name, count)
+    local header = _G[name]
+    if not header then return 0 end
+
+    local added = 0
+    for i = 1, count do
+        local frame = header[i] or header:GetAttribute("child" .. i)
+        added = added + AddEllesmereFrame(frame, name .. "_HH" .. i)
+    end
+    return added
+end
 function HealerHelper:AddUnitFrame(name)
     local uf = _G[name]
     if uf and unitFrames[uf] == nil then
@@ -87,6 +109,14 @@ function HealerHelper:UpdateAllowedUnitFrames()
         end
 
         if HealerHelper:AddUnitFrame("CompactRaidFrame" .. i) then c = c + 1 end
+    end
+    if not InCombatLockdown() then
+        c = c + AddEllesmereFrame(_G.ERFPartySelfButton, "ERFPartySelfButton")
+        c = c + AddEllesmereHeader("ERFPartyHeader", 5)
+        c = c + AddEllesmereHeader("ERFFlatHeader", 40)
+        for group = 1, 8 do
+            c = c + AddEllesmereHeader("ERFGroupHeader" .. group, 5)
+        end
     end
     return c
 end
@@ -181,7 +211,7 @@ local setupFrames = {}
 local function AddUpdateFramePosition(fra, nr, gro)
     if currentlyUpdating[fra] then return end
     currentlyUpdating[fra] = true
-    if HealerHelper:GetWoWBuild() == "CLASSIC" then
+    if not ellesmereFrames[fra] and HealerHelper:GetWoWBuild() == "CLASSIC" then
         local frameName = _G[fra:GetName() .. "Name"]
         if setupFrames[frameName] == nil then
             setupFrames[frameName] = true
@@ -221,7 +251,7 @@ local function AddUpdateFramePosition(fra, nr, gro)
     end
 
     HealerHelper:TryRunSecure(function(frame, i, group)
-        local bar = _G["HealerHelper_BAR_" .. frame:GetName()]
+        local bar = _G["HealerHelper_BAR_" .. (unitFrames[frame] or frame:GetName())]
         if frame ~= nil and HealerHelper:IsAllowed(frame) and bar then
             if HealerHelper:GetOptionValue("LAYOUT") == "BOTTOM" then
                 if bar then
@@ -240,6 +270,11 @@ local function AddUpdateFramePosition(fra, nr, gro)
                 end
             else
                 HealerHelper:MSG("[AddUpdateFramePosition] MISSING LAYOUT #1", HealerHelper:GetOptionValue("LAYOUT"))
+            end
+
+            if ellesmereFrames[frame] then
+                currentlyUpdating[frame] = nil
+                return
             end
 
             local direction = FindDirection()
@@ -316,6 +351,10 @@ end
 local function DoUpdateHealBarsLayout()
     if test then return end
     test = true
+    if not InCombatLockdown() then HealerHelper:CheckForNewFrames() end
+    for frame in pairs(ellesmereFrames) do
+        AddUpdateFramePosition(frame)
+    end
     if IsInRaid() then
         local max = MAX_RAID_MEMBERS or 40
         for i = 1, max do
@@ -366,8 +405,10 @@ function HealerHelper:CheckForNewFrames()
         for frame, name in pairs(unitFrames) do
             if frame ~= nil and healBars[frame] == nil then
                 healBars[frame] = true
-                HealerHelper:AddIcons(frame)
-                HealerHelper:AddTexts(frame)
+                if not ellesmereFrames[frame] then
+                    HealerHelper:AddIcons(frame)
+                    HealerHelper:AddTexts(frame)
+                end
                 HealerHelper:AddHealbar(frame)
             end
         end
@@ -475,7 +516,11 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
 
         HealerHelper:UpdateUnitFrameInfos()
     elseif event == "ADDON_LOADED" then
-        if select(1, ...) ~= AddonName then return end
+        local loadedAddon = ...
+        if loadedAddon == "EllesmereUIRaidFrames" and HEAHELPC then
+            C_Timer.After(0.5, RefreshGroupFrames)
+        end
+        if loadedAddon ~= AddonName then return end
         HEAHELPC = HEAHELPC or {}
         if HEAHELPC["LEVE"] == nil then HEAHELPC["LEVE"] = true end
         if HEAHELPC["FLAG"] == nil then HEAHELPC["FLAG"] = true end
@@ -503,7 +548,7 @@ healerHelper:SetScript("OnEvent", function(sel, event, ...)
         C_Timer.After(2, function()
             local currentGroupSize = GetNumGroupMembers()
             local currentInRaid = IsInRaid()
-            if currentGroupSize ~= previousGroupSize or currentInRaid ~= previousInRaid then
+            if currentGroupSize ~= previousGroupSize or currentInRaid ~= previousInRaid or _G.ERFPartyHeader or _G.ERFFlatHeader or _G.ERFGroupHeader1 then
                 previousGroupSize = currentGroupSize
                 previousInRaid = currentInRaid
                 RefreshGroupFrames()
@@ -1266,15 +1311,17 @@ function HealerHelper:AddHealbar(unitFrame)
         return
     end
 
-    local name = unitFrame:GetName()
+    local name = unitFrames[unitFrame] or unitFrame:GetName()
     if name ~= nil then
-        local setP = false
-        hooksecurefunc(unitFrame, "SetPoint", function()
-            if setP then return end
-            setP = true
-            HealerHelper:UpdateHealBarsLayout()
-            setP = false
-        end)
+        if not ellesmereFrames[unitFrame] then
+            local setP = false
+            hooksecurefunc(unitFrame, "SetPoint", function()
+                if setP then return end
+                setP = true
+                HealerHelper:UpdateHealBarsLayout()
+                setP = false
+            end)
+        end
 
         local bar = CreateFrame("Frame", "HealerHelper_BAR_" .. name, unitFrame, "SecureHandlerAttributeTemplate")
         bar:SetSize(10, 10)
@@ -1303,7 +1350,7 @@ function HealerHelper:AddHealbar(unitFrame)
             bar.t:SetAllPoints(bar)
         end
 
-        if not InCombatLockdown() then
+        if not ellesmereFrames[unitFrame] and not InCombatLockdown() then
             handlers[unitFrame] = CreateFrame("Frame", nil, nil, "SecureHandlerAttributeTemplate")
             local handler = handlers[unitFrame]
             if handler.SetFrameRef then
