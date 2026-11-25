@@ -160,9 +160,13 @@ function HealerHelper:InitSettings()
         ["name"] = "HealerHelper",
         ["icon"] = HealerHelper:GetAddonIcon(),
         ["dbtab"] = HEAHELPC,
-        ["vTT"] = {{format("|T%s:16:16:0:0|t HealerHelper", HealerHelper:GetAddonIcon()),"v" .. HealerHelper:GetVersion()}, {HealerHelper:Trans("LID_LEFTCLICK"), HealerHelper:Trans("LID_OPENSETTINGS")}, {HealerHelper:Trans("LID_RIGHTCLICK"), HealerHelper:Trans("LID_HIDEMINIMAPBUTTON")}},
+        ["vTT"] = {{format("|T%s:16:16:0:0|t HealerHelper", HealerHelper:GetAddonIcon()),"v" .. HealerHelper:GetVersion()}, {HealerHelper:Trans("LID_LEFTCLICK"), HealerHelper:Trans("LID_OPENSETTINGS")}, {HealerHelper:Trans("LID_RIGHTCLICK"), HealerHelper:Trans("LID_OPENSETTINGS")}, {HealerHelper:Trans("LID_SHIFTRIGHTCLICK"), HealerHelper:Trans("LID_HIDEMINIMAPBUTTON")}},
         ["funcL"] = function() HealerHelper:ToggleSettings() end,
-        ["funcR"] = function() HealerHelper:HideMMBtn("HealerHelper") end,
+        ["funcR"] = function() HealerHelper:ToggleSettings() end,
+        ["funcSR"] = function()
+            HEAHELPC["MMBTN"] = false
+            HealerHelper:HideMMBtn("HealerHelper")
+        end,
         ["dbkey"] = "MMBTN"
     })
 end
