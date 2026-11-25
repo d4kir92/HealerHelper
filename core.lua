@@ -1454,6 +1454,11 @@ function HealerHelper:AddIcons(frame)
             return
         end
 
+        if HealerHelper:IsForever() then
+            icon:SetTexture(nil)
+            return
+        end
+
         local nam, realmName = UnitName(parent.unit)
         if nam == nil then return end
         if HealerHelper:IsSecret(nam) or HealerHelper:IsSecret(realmName) then
@@ -1465,7 +1470,7 @@ function HealerHelper:AddIcons(frame)
         if realmName == nil then realmName = GetRealmName() end
         local lang = nil
         if realmName then lang = HealerHelper:GetRealmFlag(realmName) end
-        if lang then
+        if lang and lang ~= "" then
             icon:SetTexture("Interface\\AddOns\\HealerHelper\\media\\" .. lang)
         else
             icon:SetTexture(nil)
